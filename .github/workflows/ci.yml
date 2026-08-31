@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  verificar:
+    name: Tipos, testes e orçamento
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Tipos
+        run: npm run typecheck
+
+      # O orçamento de performance da seção 3 do plano roda aqui: se a cena de
+      # referência estourar o teto de tempo de lógica, a mudança não entra.
+      - name: Testes e orçamento de performance
+        run: npm test
+
+      - name: Build do jogo publicado
+        run: npm run build

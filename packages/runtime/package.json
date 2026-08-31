@@ -1,0 +1,17 @@
+{
+  "name": "@faisca/runtime",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Nucleo da engine Faisca: ECS, laco de jogo, render e orcamento de performance",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.180.0"
+  }
+}

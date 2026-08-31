@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Faísca — cena de referência</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>%E2%9A%A1</text></svg>"
+    />
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; background: #0e1117; overflow: hidden; }
+      #palco { position: relative; width: 100vw; height: 100vh; }
+      canvas { display: block; width: 100%; height: 100%; }
+      .painel {
+        position: absolute; right: 12px; bottom: 12px; z-index: 10;
+        width: 268px; padding: 12px 14px; border-radius: 10px;
+        font: 13px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+        color: #e6e9f0; background: rgba(14, 17, 23, 0.86);
+        border: 1px solid rgba(255,255,255,0.09); backdrop-filter: blur(6px);
+      }
+      .painel h2 { margin: 0 0 2px; font-size: 14px; }
+      .painel p { margin: 0 0 10px; font-size: 12px; opacity: 0.6; }
+      .painel .linha { display: flex; gap: 6px; margin-bottom: 6px; }
+      .painel button {
+        flex: 1; padding: 7px 4px; cursor: pointer; font: inherit; font-size: 12px;
+        color: #e6e9f0; background: #1c2230; border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 7px;
+      }
+      .painel button:hover { background: #273046; }
+      .painel button[aria-pressed="true"] { background: #2f6f4f; border-color: #48b07c; }
+      .veredito {
+        margin-top: 10px; padding-top: 9px; font-size: 12px;
+        border-top: 1px solid rgba(255,255,255,0.09);
+      }
+      .veredito b { display: block; font-size: 13px; margin-bottom: 2px; }
+      .bom { color: #4ade80; } .medio { color: #fbbf24; } .ruim { color: #f87171; }
+    </style>
+  </head>
+  <body>
+    <div id="palco">
+      <canvas id="tela"></canvas>
+      <div class="painel">
+        <h2>Cena de referência</h2>
+        <p>Anéis instanciados: uma chamada de desenho para todos.</p>
+        <div class="linha">
+          <button id="mais-mil">+1.000 anéis</button>
+          <button id="mais-cinco">+5.000</button>
+        </div>
+        <div class="linha">
+          <button id="limpar">Recomeçar</button>
+          <button id="auto" aria-pressed="true">Qualidade auto</button>
+        </div>
+        <div class="veredito" id="veredito">Medindo…</div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

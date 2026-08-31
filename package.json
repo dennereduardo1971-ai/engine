@@ -1,0 +1,29 @@
+{
+  "name": "faisca",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Engine de jogos 2D/3D para a familia criar jogos junto",
+  "license": "MIT",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @faisca/playground",
+    "build": "npm run build --workspace @faisca/playground",
+    "preview": "npm run preview --workspace @faisca/playground",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "orcamento": "vitest run --reporter verbose packages/runtime/test/orcamento.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.7",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=20.19"
+  }
+}

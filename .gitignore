@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.faisca/
+coverage/
+*.tsbuildinfo
+*.local
+.vite/
+.DS_Store

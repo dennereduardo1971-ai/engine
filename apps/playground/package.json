@@ -1,0 +1,17 @@
+{
+  "name": "@faisca/playground",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Cena de referencia da Faisca: abre uma janela 3D e mede se a maquina aguenta",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@faisca/runtime": "*",
+    "three": "^0.180.0"
+  }
+}

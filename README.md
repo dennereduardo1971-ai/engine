@@ -97,6 +97,15 @@ perda, e há teste para isso.
   mola em torno do Y não muda para onde ela aponta — atirar de lado exige inclinar, que o
   formato de cena ainda não guarda.
 
+## Jogar sem instalar nada
+
+A cada mudança nesta branch, o GitHub Actions publica o editor e a cena de referência:
+
+**https://dennereduardo1971-ai.github.io/engine/**
+
+Use Chrome, Edge ou Firefox no computador. Ainda não há controles de toque, então o celular
+abre mas não dá para jogar. Nada do que você fizer sai da sua máquina.
+
 ## Como rodar
 
 Precisa de Node 20.19 ou mais novo.

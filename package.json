@@ -16,7 +16,8 @@
     "preview": "npm run preview --workspace @faisca/editor",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
-    "orcamento": "vitest run --reporter verbose packages/runtime/test/orcamento.test.ts"
+    "orcamento": "vitest run --reporter verbose packages/runtime/test/orcamento.test.ts",
+    "site": "node scripts/montar-site.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.20.1",

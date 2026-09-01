@@ -27,6 +27,21 @@ export {
   type UpdateContext,
 } from './ecs/system.ts';
 
+export {
+  Input,
+  applyDeadzone,
+  type GamepadLike,
+  type InputOptions,
+  type Vec2,
+} from './input/input.ts';
+export {
+  defaultBindings,
+  XBOX,
+  type AxisBinding,
+  type Bindings,
+  type ButtonBinding,
+} from './input/bindings.ts';
+
 export { Loop, DEFAULT_STEP, type LoopOptions } from './loop/loop.ts';
 export { Profiler, BUDGET, type FrameStats } from './loop/profiler.ts';
 

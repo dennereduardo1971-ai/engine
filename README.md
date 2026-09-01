@@ -17,11 +17,12 @@ O jogo de referência é um **Sonic 3D**: velocidade, momentum, loops, molas, ra
 
 ## Estado
 
-**M0 entregue:** o esqueleto do runtime roda. Uma janela 3D abre, o laço de passo fixo
-gira, e o painel de performance responde a pergunta que o M0 existe para responder —
-*esta máquina aguenta 60 fps?* — com número na mão.
+**M0 e M1 entregues.** Uma janela 3D abre, o laço de passo fixo gira, e o painel de
+performance responde a pergunta do M0 — *esta máquina aguenta 60 fps?* — com número na
+mão. E tem um bonequinho que anda com o controle de Xbox, com câmera que segue sozinha.
 
-Próxima fatia: **M1** — personagem controlável, câmera que segue e gamepad de Xbox.
+Próxima fatia: **M2** — Rapier: gravidade, rampas, momentum e superfície grudenta. É onde
+o loop-the-loop aparece.
 
 ## Como rodar
 
@@ -41,12 +42,25 @@ npm run typecheck
 npm run build    # empacota a cena de referência
 ```
 
+### Os controles
+
+| | Controle de Xbox | Teclado e mouse |
+|---|---|---|
+| Andar | analógico esquerdo | `WASD` ou setas |
+| Olhar | analógico direito | mouse (clique na tela para travar o ponteiro) |
+| Pular | `A` | `espaço` |
+
+O controle é lido por **ação**, nunca por tecla: o jogo pergunta "o jogador quer pular?",
+e não "o botão A está apertado?". É isso que vai permitir o remapeamento total que a
+seção 13 do plano promete, e é isso que faz o mesmo jogo funcionar no controle e no
+teclado sem mudar uma linha.
+
 ### A cena de referência
 
 Ela não é bonita de propósito: é feita das mesmas peças que uma fase de verdade vai usar,
-para medir o que importa. Milhares de anéis **instanciados** (todos numa chamada de
-desenho só), movidos pelo ECS em passo fixo, com o orçamento da seção 3 do plano medido
-a cada quadro:
+para medir o que importa. Um bonequinho que se dirige, uma câmera que segue, e milhares
+de anéis **instanciados** (todos numa chamada de desenho só), movidos pelo ECS em passo
+fixo, com o orçamento da seção 3 do plano medido a cada quadro:
 
 - **verde** é folga, **amarelo** é no limite, **vermelho** estourou;
 - os botões somam anéis até a máquina reclamar — o veredito mostra quantos ela sustenta a 60 fps;
@@ -56,18 +70,21 @@ a cada quadro:
 ## Estrutura
 
 ```
-packages/runtime/     # a engine: ECS, laço, render, orçamento. Roda sem o editor.
-  src/ecs/            # entidades, componentes em arrays contíguos, visões, sistemas
-  src/loop/           # laço de passo fixo e medidor de orçamento
-  src/render/         # renderizador, qualidade adaptativa, instancing
-  src/scene/          # Transform, Velocity e os sistemas de fundação
-  src/debug/          # painel de performance
-apps/playground/      # a cena de referência que abre no navegador
-docs/PLANO.md         # o contrato do projeto
+packages/runtime/       # a engine: ECS, laço, entrada, render, orçamento
+  src/ecs/              # entidades, componentes em arrays contíguos, visões, sistemas
+  src/loop/             # laço de passo fixo e medidor de orçamento
+  src/input/            # ações, mapeamento de controles, gamepad de Xbox
+  src/render/           # renderizador, qualidade adaptativa, instancing
+  src/scene/            # Transform, Velocity e os sistemas de fundação
+  src/debug/            # painel de performance
+packages/kit-velocidade/  # o coração Sonic: personagem veloz e câmera que segue
+apps/playground/        # a cena de referência que abre no navegador
+docs/PLANO.md           # o contrato do projeto
 ```
 
-A regra de ouro das camadas vale desde já: **o runtime não sabe que o editor existe.**
-É ele que vai dentro do jogo publicado.
+A regra de ouro das camadas vale desde já: **cada camada só conhece a de baixo.** O kit
+conhece o runtime; o runtime não sabe que o kit existe, nem que o editor existe. É o
+runtime que vai dentro do jogo publicado.
 
 ## Orçamento de performance no CI
 

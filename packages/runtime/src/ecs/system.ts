@@ -20,6 +20,12 @@ export interface UpdateContext {
   /** Numero do quadro desenhado desde o inicio. */
   readonly frame: number;
   /**
+   * Tempo real do ultimo quadro, em segundos. A fase de logica recebe o passo
+   * fixo; a de render recebe o intervalo de verdade, que e o que uma camera
+   * suavizada precisa para se comportar igual a 30 e a 144 fps.
+   */
+  readonly frameTime: number;
+  /**
    * Quanto do proximo passo ja passou, de 0 a 1. So a fase de render usa:
    * e o que deixa o desenho suave mesmo com a simulacao em passo fixo.
    */

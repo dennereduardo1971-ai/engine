@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { World } from './ecs/world.ts';
+import { Input, type InputOptions } from './input/input.ts';
 import { type Entity } from './ecs/entity.ts';
 import { Scheduler, type System, type UpdateContext } from './ecs/system.ts';
 import { Loop } from './loop/loop.ts';
@@ -18,6 +19,8 @@ export interface EngineOptions {
   clearColor?: number;
   /** Liga a qualidade adaptativa. Padrao: ligada. */
   adaptiveQuality?: boolean;
+  /** Opcoes da entrada (mapeamento de controles, alvo dos eventos). */
+  input?: InputOptions;
 }
 
 /**
@@ -37,6 +40,7 @@ export class Engine {
   readonly camera: THREE.PerspectiveCamera;
   readonly objects: ObjectRegistry;
   readonly loop: Loop;
+  readonly input: Input;
 
   private readonly batches: InstancedBatch[] = [];
   private logicMs = 0;
@@ -50,6 +54,7 @@ export class Engine {
     });
     this.camera = new THREE.PerspectiveCamera(60, this.renderer.aspect, 0.1, 500);
     this.objects = new ObjectRegistry(this.scene);
+    this.input = new Input(options.input);
     this.quality = new QualitySupervisor(this.profiler);
     this.quality.enabled = options.adaptiveQuality ?? true;
 
@@ -114,6 +119,7 @@ export class Engine {
 
   dispose(): void {
     this.stop();
+    this.input.dispose();
     this.scheduler.stopAll(this.world);
     for (const batch of this.batches) batch.dispose();
     this.renderer.dispose();
@@ -126,10 +132,14 @@ export class Engine {
       elapsed,
       step,
       frame: this.profiler.frame,
+      frameTime: dt,
       alpha: 1,
     };
 
+    // A entrada e lida antes de qualquer sistema: as bordas de botao ficam
+    // alinhadas com o passo da simulacao.
     let mark = performance.now();
+    this.input.update();
     this.scheduler.run('logic', context);
     const afterLogic = performance.now();
     this.logicMs += afterLogic - mark;
@@ -152,6 +162,7 @@ export class Engine {
       elapsed: this.loop.elapsed,
       step: this.loop.stepCount,
       frame: this.profiler.frame,
+      frameTime,
       alpha,
     };
 

@@ -23,6 +23,13 @@
       }
       .painel h2 { margin: 0 0 2px; font-size: 14px; }
       .painel p { margin: 0 0 10px; font-size: 12px; opacity: 0.6; }
+      .painel .controle { margin: 0 0 8px; font-size: 12px; opacity: 0.85; }
+      .painel .medidor { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+      .painel .trilho { flex: 1; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.12); overflow: hidden; }
+      .painel .trilho div { height: 100%; width: 0%; background: #4f7cff; border-radius: 3px; }
+      .painel .numero { font: 12px/1 ui-monospace, Menlo, monospace; opacity: 0.75; white-space: nowrap; }
+      .teclas { margin-top: 10px; padding-top: 9px; border-top: 1px solid rgba(255,255,255,0.09); font-size: 11px; opacity: 0.55; line-height: 1.6; }
+      kbd { padding: 1px 5px; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; font: inherit; }
       .painel .linha { display: flex; gap: 6px; margin-bottom: 6px; }
       .painel button {
         flex: 1; padding: 7px 4px; cursor: pointer; font: inherit; font-size: 12px;
@@ -44,7 +51,12 @@
       <canvas id="tela"></canvas>
       <div class="painel">
         <h2>Cena de referência</h2>
-        <p>Anéis instanciados: uma chamada de desenho para todos.</p>
+        <p>Ande com o controle. Os anéis são instanciados: uma chamada de desenho para todos.</p>
+        <div class="controle" id="controle">procurando controle…</div>
+        <div class="medidor">
+          <div class="trilho"><div id="barra-velocidade"></div></div>
+          <span class="numero" id="velocidade">0.0 / 24 u/s</span>
+        </div>
         <div class="linha">
           <button id="mais-mil">+1.000 anéis</button>
           <button id="mais-cinco">+5.000</button>
@@ -54,6 +66,10 @@
           <button id="auto" aria-pressed="true">Qualidade auto</button>
         </div>
         <div class="veredito" id="veredito">Medindo…</div>
+        <div class="teclas">
+          <kbd>WASD</kbd> andar · <kbd>espaço</kbd> pular · <kbd>clique</kbd> trava o mouse para
+          olhar · no controle: analógico esquerdo anda, direito olha, <kbd>A</kbd> pula.
+        </div>
       </div>
     </div>
     <script type="module" src="/src/main.ts"></script>

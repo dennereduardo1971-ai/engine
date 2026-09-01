@@ -73,6 +73,7 @@ function medir(mundo: World, agendador: Scheduler, passos: number): number {
       elapsed: passo * DEFAULT_STEP,
       step: passo,
       frame: passo,
+      frameTime: DEFAULT_STEP,
       alpha: 1,
     };
     perfil.begin('logic');

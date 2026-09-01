@@ -267,7 +267,7 @@ Entrega em fatias. Cada fatia é um pull request, e termina com **algo que você
 | **M1** ✅ | Personagem controlável, câmera que segue, **gamepad de Xbox** | Andar com um bonequinho usando o controle |
 | **M2** ✅ | Rapier: gravidade, rampas, momentum, **superfície grudenta** | Correr num loop e sair dele |
 | **M3** ✅ | Editor v0: viewport, árvore de cena, inspetor, salvar/carregar, hot reload | Montar uma pista com peças e testar na hora |
-| **M4** | Anéis, molas, inimigo patrulheiro, meta, HUD, save | **Um jogo completo, do início ao fim** |
+| **M4** ✅ | Anéis, molas, inimigo patrulheiro, meta, HUD, save | **Um jogo completo, do início ao fim** |
 
 > **Fora de ordem, e resolvido:** a M3 foi entregue antes da M2. Enquanto o Rapier não
 > chegava, o chão das peças no teste ao vivo do editor era uma *consulta de altura*, e não

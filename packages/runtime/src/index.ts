@@ -12,6 +12,7 @@ export {
   defineComponent,
   defineTag,
   NO_SLOT,
+  type Defaults,
   type FieldType,
   type Fields,
   type Schema,
@@ -80,6 +81,8 @@ export {
   physicsStepSystem,
   physicsSyncSystem,
 } from './physics/components.ts';
+
+export { MemoryStorage, SaveSlot, type SaveOptions } from './save/save.ts';
 
 export { Engine, type EngineOptions } from './engine.ts';
 export { PerfHud } from './debug/perf-hud.ts';

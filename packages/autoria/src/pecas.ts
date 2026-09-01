@@ -21,7 +21,9 @@ export type MeshKind =
   | 'loop'
   | 'anel'
   | 'cone'
-  | 'marco';
+  | 'marco'
+  | 'mola'
+  | 'inimigo';
 
 export interface MeshSpec {
   kind: MeshKind;
@@ -182,7 +184,7 @@ export const PIECES: readonly Piece[] = [
     capacity: 20_000,
     solid: false,
     dropY: 1.2,
-    components: {},
+    components: { Collectible: { value: 1, radius: 1.3 } },
   },
   {
     id: 'loop',
@@ -201,6 +203,45 @@ export const PIECES: readonly Piece[] = [
     solid: true,
     dropY: 0,
     components: {},
+  },
+  {
+    id: 'mola',
+    label: 'Mola',
+    icon: '🔺',
+    group: 'pista',
+    hint: 'Joga o personagem para o lado que ela aponta. Gire-a para atirar de lado.',
+    mesh: { kind: 'mola', size: [1.9, 0.7, 1.9] },
+    color: 0xf05a5a,
+    instanced: true,
+    solid: false,
+    dropY: 0,
+    components: { Spring: { power: 26, radius: 1.4 } },
+  },
+  {
+    id: 'patrulheiro',
+    label: 'Patrulheiro',
+    icon: '👾',
+    group: 'jogo',
+    hint: 'Anda de um lado para o outro. Pise em cima para derrotar; encoste de lado e se machuque.',
+    mesh: { kind: 'inimigo', size: [1.7, 1.7, 1.7] },
+    color: 0xb45cf0,
+    instanced: true,
+    solid: false,
+    dropY: 0.85,
+    components: { Patroller: { speed: 4, range: 6, radius: 0.9 } },
+  },
+  {
+    id: 'meta',
+    label: 'Meta',
+    icon: '🏁',
+    group: 'jogo',
+    hint: 'O fim da fase. Encostar aqui termina o jogo.',
+    mesh: { kind: 'marco', size: [1.5, 5.5, 0.3] },
+    color: 0x4ade80,
+    instanced: false,
+    solid: false,
+    dropY: 0,
+    components: { Goal: { radius: 2.2 } },
   },
   {
     id: 'arvore',
@@ -336,6 +377,27 @@ function buildGeometry(mesh: MeshSpec): THREE.BufferGeometry {
       const geometry = new THREE.ConeGeometry(w / 2, h, 7);
       geometry.translate(0, h / 2, 0);
       return geometry;
+    }
+    case 'mola': {
+      const [w, h] = mesh.size;
+      // Uma almofada: larga em cima, mais estreita embaixo. De longe se
+      // reconhece que e para pisar.
+      const almofada = new THREE.CylinderGeometry(w / 2, w * 0.36, h, 14);
+      almofada.translate(0, h / 2, 0);
+      const base = new THREE.CylinderGeometry(w * 0.4, w * 0.44, h * 0.3, 14);
+      base.translate(0, h * 0.15, 0);
+      return mergeGeometries([base, almofada]);
+    }
+    case 'inimigo': {
+      const [w, h] = mesh.size;
+      // Corpo redondo e um espinho em cima: a silhueta ja avisa que pisar nele
+      // e o jeito, e que encostar de lado nao e.
+      const corpo = new THREE.SphereGeometry(w / 2, 12, 8);
+      corpo.scale(1, (h * 0.7) / w, 1);
+      corpo.translate(0, h * 0.42, 0);
+      const espinho = new THREE.ConeGeometry(w * 0.18, h * 0.34, 6);
+      espinho.translate(0, h * 0.82, 0);
+      return mergeGeometries([corpo, espinho]);
     }
     case 'marco': {
       // Bandeira: um mastro fino e um triangulo em cima. Grupo nao da para

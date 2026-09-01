@@ -9,7 +9,8 @@ import {
   Transform,
   World,
 } from '@faisca/runtime';
-import { SpeedCharacter } from '@faisca/kit-velocidade';
+import { Collectible, Goal, SpeedCharacter, Spring } from '@faisca/kit-velocidade';
+import { Patroller } from '@faisca/kit-inimigos';
 import {
   type AssemblerHost,
   faseDeExemplo,
@@ -246,6 +247,76 @@ describe('colisor das pecas', () => {
 
     doc.remove(no.id);
     expect(alturaEm(0, 0)).toBe(null);
+  });
+});
+
+describe('a peça vira comportamento', () => {
+  /**
+   * Uma peca declara os componentes que ela tem, e o montador transforma isso
+   * em componente de verdade na entidade. E este passo que separa "um anel
+   * desenhado" de "um anel que se pega" — sem ele, a fase seria uma maquete.
+   */
+  it('o anel nasce coletável, com os valores da peça', () => {
+    const no = doc.add('anel');
+    montador.build();
+    const entidade = montador.entityOf(no.id)!;
+
+    const vaga = Collectible.slotOf(entidade);
+    expect(vaga).toBeGreaterThanOrEqual(0);
+    expect(Collectible.fields.value[vaga]).toBe(1);
+    expect(Collectible.fields.radius[vaga]).toBeCloseTo(1.3, 4);
+    expect(Collectible.fields.collected[vaga]).toBe(0);
+  });
+
+  it('a mola, o patrulheiro e a meta também', () => {
+    const mola = doc.add('mola');
+    const bicho = doc.add('patrulheiro');
+    const meta = doc.add('meta');
+    montador.build();
+
+    expect(Spring.slotOf(montador.entityOf(mola.id)!)).toBeGreaterThanOrEqual(0);
+    expect(Goal.slotOf(montador.entityOf(meta.id)!)).toBeGreaterThanOrEqual(0);
+
+    const ps = Patroller.slotOf(montador.entityOf(bicho.id)!);
+    expect(ps).toBeGreaterThanOrEqual(0);
+    // Estado de fábrica: vivo, e com raio de contato de verdade.
+    expect(Patroller.fields.alive[ps]).toBe(1);
+    expect(Patroller.fields.radius[ps]).toBeGreaterThan(0);
+  });
+
+  it('o que o nó edita ganha do valor de fábrica da peça', () => {
+    const no = doc.add('patrulheiro', { fields: { Patroller: { speed: 12 } } });
+    montador.build();
+    const ps = Patroller.slotOf(montador.entityOf(no.id)!);
+    expect(Patroller.fields.speed[ps]).toBe(12);
+  });
+
+  it('o ponto de partida não fica com os componentes do personagem', () => {
+    // Os deslizadores do Ponto de Partida descrevem o herói e a câmera do
+    // teste, que são outras entidades: o marcador em si não é um personagem.
+    const no = doc.add('inicio');
+    montador.build();
+    expect(SpeedCharacter.slotOf(montador.entityOf(no.id)!)).toBe(-1);
+  });
+
+  it('parar o teste devolve a fase ao estado de antes', () => {
+    const anel = doc.add('anel');
+    const bicho = doc.add('patrulheiro');
+    doc.add('inicio');
+    montador.build();
+    montador.startPlay();
+
+    const anelEntidade = montador.entityOf(anel.id)!;
+    const bichoEntidade = montador.entityOf(bicho.id)!;
+    Collectible.fields.collected[Collectible.slotOf(anelEntidade)] = 1;
+    Transform.fields.sx[Transform.slotOf(anelEntidade)] = 0;
+    Patroller.fields.alive[Patroller.slotOf(bichoEntidade)] = 0;
+
+    montador.stopPlay();
+
+    expect(Collectible.fields.collected[Collectible.slotOf(anelEntidade)]).toBe(0);
+    expect(Transform.fields.sx[Transform.slotOf(anelEntidade)]).toBe(1);
+    expect(Patroller.fields.alive[Patroller.slotOf(bichoEntidade)]).toBe(1);
   });
 });
 

@@ -17,7 +17,7 @@ O jogo de referência é um **Sonic 3D**: velocidade, momentum, loops, molas, ra
 
 ## Estado
 
-**M0, M1, M2 e M3 entregues.** Uma janela 3D abre, o laço de passo fixo gira, o painel de
+**Mês 1 completo: M0, M1, M2, M3 e M4 entregues.** Uma janela 3D abre, o laço de passo fixo gira, o painel de
 performance responde a pergunta do M0 — *esta máquina aguenta 60 fps?* — com número na
 mão, e tem um bonequinho que anda com o controle de Xbox, com câmera que segue sozinha.
 
@@ -34,8 +34,24 @@ especial para rampa. E ela só puxa para fora da superfície quando a velocidade
 do limite de aderência — o instante exato em que o Sonic despenca do loop se estiver
 devagar.
 
-Próxima fatia: **M4** — anéis, molas, inimigo patrulheiro, meta, HUD e save: *um jogo
-completo, do início ao fim*.
+E, com a **M4**, a fase de exemplo virou **um jogo**, do início ao fim: anéis para juntar,
+molas de atalho, um patrulheiro que anda de um lado para o outro, uma meta que termina a
+fase, HUD com anéis, vidas e tempo, e o recorde guardado na máquina.
+
+A regra do dano é a do Sonic, e é ela que faz o anel valer alguma coisa: **com anel, você
+perde os anéis; sem anel, perde uma vida.** Um jogo em que encostar num inimigo tira uma
+vida direto castiga quem está aprendendo — e quem está aprendendo aqui tem seis anos.
+
+Próxima fatia: **M5** — blocos ⇄ código, a decisão mais importante do projeto (seção 7):
+os blocos visuais e o TypeScript são duas visões da *mesma* árvore, com ida e volta sem
+perdas.
+
+### O que é guardado, e onde
+
+O recorde de cada fase — se você chegou ao fim, o melhor tempo e o recorde de anéis — fica
+no `localStorage` do navegador, na sua máquina, e em lugar nenhum além dela. É a seção 13
+do plano valendo: **zero telemetria**. Se o navegador recusar gravar (aba anônima, por
+exemplo), o jogo roda igual, só não guarda recorde.
 
 ### Arestas conhecidas
 
@@ -44,6 +60,12 @@ completo, do início ao fim*.
   trabalho do Kit Velocidade, ainda por fazer.
 - O pacote do jogo passou de 0,5 MB para 2,7 MB, quase tudo wasm do Rapier embutido. Cabe
   folgado nos 15 MB que o plano dá para um jogo publicado, mas é o piso agora.
+- Anel, mola e meta são detectados por distância, e não por colisor: é O(quantidade de
+  brinquedos) por quadro. Custa nada com os milhares de uma fase, e vai precisar de uma
+  grade espacial se um dia forem dezenas de milhares.
+- A mola só atira para cima. O editor gira peças em guinada (em torno do Y), e girar a
+  mola em torno do Y não muda para onde ela aponta — atirar de lado exige inclinar, que o
+  formato de cena ainda não guarda.
 
 ## Como rodar
 
@@ -158,7 +180,8 @@ packages/runtime/       # a engine: ECS, laço, entrada, render, orçamento
   src/render/           # renderizador, qualidade adaptativa, instancing
   src/scene/            # Transform, Velocity e os sistemas de fundação
   src/debug/            # painel de performance
-packages/kit-velocidade/  # o coração Sonic: personagem veloz e câmera que segue
+packages/kit-velocidade/  # o coração Sonic: personagem, câmera, anéis, molas, meta, HUD
+packages/kit-inimigos/  # patrulheiro agora; perseguidor, atirador e voador depois
 packages/autoria/       # documento de cena, formato .cena, peças, desfazer, montador
 apps/editor/            # o editor: viewport, árvore, inspetor, peças, teste ao vivo
 apps/playground/        # a cena de referência que mede a máquina

@@ -13,8 +13,10 @@ import {
   FollowCamera,
   makeFollowCamera,
   makeSpeedCharacter,
+  resetTrackToys,
   SpeedCharacter,
 } from '@faisca/kit-velocidade';
+import { resetPatrollers } from '@faisca/kit-inimigos';
 import { type SceneChange, type SceneDocument, type SceneNode } from './documento.ts';
 import { type Piece, pieceGeometry, pieceOrPlaceholder, scaledTrimesh } from './pecas.ts';
 import { worldPlacement, yawQuaternion } from './transformacoes.ts';
@@ -179,6 +181,14 @@ export class SceneAssembler {
       this.host.world.destroy(this.cameraEntity);
       this.cameraEntity = -1;
     }
+
+    // Sair do teste devolve a fase ao que ela era: anel pego volta, inimigo
+    // derrotado levanta, mola disparada descarrega. Sem isto, testar a fase a
+    // consumiria — a segunda vez que a mae apertasse Jogar, metade dos aneis
+    // teria sumido do projeto dela.
+    resetTrackToys();
+    resetPatrollers();
+    for (const node of this.document.nodes) this.place(node);
   }
 
   get playing(): boolean {
@@ -246,9 +256,28 @@ export class SceneAssembler {
       }
     }
 
+    // Os componentes que a peca declara viram componentes de verdade na
+    // entidade. E isto que transforma "um anel desenhado" em "um anel que se
+    // pega": o comportamento mora no kit, e a peca so diz qual deles ela tem.
+    //
+    // O ponto de partida e a excecao: os componentes dele descrevem o
+    // personagem e a camera do teste, que sao outras entidades.
+    if (node.piece !== 'inicio') {
+      for (const nome of Object.keys(piece.components)) {
+        const componente = componentRegistry.find((candidato) => candidato.name === nome);
+        componente?.add(entity);
+      }
+    }
+
     this.built.set(node.id, built);
     this.byEntity.set(entity, node.id);
     this.place(node);
+    // Primeiro os valores de fabrica da peca, depois o que foi editado no no.
+    if (node.piece !== 'inicio') {
+      for (const [nome, valores] of Object.entries(piece.components)) {
+        applyFieldsTo(entity, valores, nome);
+      }
+    }
     this.applyFields(node.id, null);
   }
 

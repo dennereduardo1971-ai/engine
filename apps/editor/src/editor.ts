@@ -1,11 +1,19 @@
 import * as THREE from 'three';
-import { Engine, PerfHud, Transform, defineSystem } from '@faisca/runtime';
+import { Engine, PerfHud, SaveSlot, Transform, defineSystem } from '@faisca/runtime';
 import {
   followCameraSystem,
+  GameHud,
   groundSpeed,
+  Partida,
+  PROGRESSO_VAZIO,
+  type ProgressoDaFase,
+  somarProgresso,
   SpeedCharacter,
   speedCharacterSystem,
+  formatarTempo,
+  trackToysSystem,
 } from '@faisca/kit-velocidade';
+import { patrollerSystem } from '@faisca/kit-inimigos';
 import {
   faseDeExemplo,
   findPiece,
@@ -45,6 +53,12 @@ export class Editor {
   readonly history: History;
   readonly viewport: Viewport;
   readonly hud: PerfHud;
+  /** O HUD do jogo: anéis, vidas, tempo. Só aparece no teste. */
+  readonly hudJogo: GameHud;
+  /** O estado de quem está jogando agora. */
+  readonly partida = new Partida();
+  /** Onde o personagem nasce e para onde ele volta ao cair. */
+  readonly spawn = { x: 0, y: 0, z: 0, yaw: 0 };
 
   selection: string | null = null;
   /** Peca escolhida no painel: com ela na mao, clicar no chao coloca uma. */
@@ -58,6 +72,14 @@ export class Editor {
   message: string | null = null;
 
   private readonly listeners = new Set<() => void>();
+  /**
+   * O progresso guardado, por fase.
+   *
+   * Fica na máquina e mais em lugar nenhum (seção 13: zero telemetria). Se o
+   * navegador recusar gravar, o jogo funciona igual — só não guarda recorde.
+   */
+  private readonly progresso = new SaveSlot<Record<string, ProgressoDaFase>>('progresso', 1);
+  private estadoAnterior: string = 'jogando';
   private salvarPendente: ReturnType<typeof setTimeout> | null = null;
   private avisoPendente = 0;
 
@@ -91,6 +113,27 @@ export class Editor {
     // montar e desmontar o agendador a cada play.
     const physics = this.engine.physics;
     if (!physics) throw new Error('Faísca: o editor precisa da física ligada.');
+
+    // O jogo dentro do editor: anéis, molas, meta, inimigos e o HUD. Como os
+    // sistemas ficam registrados o tempo todo e fora do teste não existe
+    // personagem nenhum, eles não custam nada em modo de edição.
+    this.engine.add(
+      trackToysSystem({ partida: this.partida, spawn: this.spawn }),
+    );
+    this.engine.add(patrollerSystem({ partida: this.partida }));
+    this.hudJogo = new GameHud(this.partida, palco, {
+      dica: 'Aperte Parar para voltar a editar.',
+    });
+    this.hudJogo.element.hidden = true;
+    this.engine.add(this.hudJogo.system());
+    this.engine.add(
+      defineSystem({
+        name: 'FimDaFase',
+        phase: 'render',
+        order: 899,
+        update: () => this.acompanharPartida(),
+      }),
+    );
     this.engine.add(
       speedCharacterSystem({ camera: this.engine.camera, input: this.engine.input, physics }),
     );
@@ -326,18 +369,59 @@ export class Editor {
     this.viewport.saveCamera();
     this.viewport.setEditing(false);
     this.engine.loop.paused = false;
+
+    // O ponto de partida também é para onde ele volta ao cair no buraco.
+    Object.assign(this.spawn, this.assembler.spawnPoint());
+    this.partida.reiniciar();
+    this.estadoAnterior = 'jogando';
+    this.hudJogo.recorde = '';
+    this.hudJogo.invalidar();
+    this.hudJogo.element.hidden = false;
+
     this.assembler.startPlay();
     this.notify();
   }
 
   stop(): void {
     if (this.mode === 'editar') return;
+    this.hudJogo.element.hidden = true;
     this.assembler.stopPlay();
     this.engine.loop.paused = false;
     this.mode = 'editar';
     this.viewport.setEditing(true);
     this.viewport.restoreCamera();
     if (window.document.pointerLockElement) window.document.exitPointerLock();
+    this.notify();
+  }
+
+  /**
+   * Vê a partida terminar e guarda o resultado.
+   *
+   * Roda todo quadro e quase sempre não faz nada: só a transição de "jogando"
+   * para "venceu" ou "perdeu" interessa.
+   */
+  private acompanharPartida(): void {
+    if (this.partida.estado === this.estadoAnterior) return;
+    this.estadoAnterior = this.partida.estado;
+    if (this.partida.estado === 'jogando') return;
+
+    const nome = this.document.name || 'Fase';
+    const todos = this.progresso.read() ?? {};
+    const antes = todos[nome] ?? PROGRESSO_VAZIO;
+    const depois = somarProgresso(antes, this.partida);
+    todos[nome] = depois;
+
+    if (!this.progresso.write(todos)) {
+      this.hudJogo.recorde = 'Este navegador não deixa guardar o recorde.';
+    } else if (depois.melhorTempo !== null && depois.melhorTempo === this.partida.tempo) {
+      this.hudJogo.recorde =
+        antes.melhorTempo === null
+          ? 'Primeira vez que você chega ao fim!'
+          : `Recorde novo: ${formatarTempo(depois.melhorTempo)}`;
+    } else if (antes.melhorTempo !== null) {
+      this.hudJogo.recorde = `Seu recorde: ${formatarTempo(antes.melhorTempo)}`;
+    }
+    this.hudJogo.invalidar();
     this.notify();
   }
 

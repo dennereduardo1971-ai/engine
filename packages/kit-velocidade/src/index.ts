@@ -16,6 +16,28 @@ export {
 } from './character.ts';
 
 export {
+  Collectible,
+  Goal,
+  Spring,
+  trackToysSystem,
+  renascer,
+  resetTrackToys,
+  foiColetado,
+  type TrackToysOptions,
+} from './brinquedos.ts';
+
+export { GameHud, formatarTempo, type GameHudOptions } from './hud.ts';
+
+export {
+  Partida,
+  somarProgresso,
+  PROGRESSO_VAZIO,
+  type EstadoDaPartida,
+  type ProgressoDaFase,
+  type ResumoDaPartida,
+} from './partida.ts';
+
+export {
   FollowCamera,
   followCameraSystem,
   makeFollowCamera,

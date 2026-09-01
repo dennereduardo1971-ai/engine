@@ -56,7 +56,9 @@ export function faseDeExemplo(): SceneData {
   no('plataforma', 'Plataforma solta', { x: 22, y: 2, z: 50, yaw: 90 }, pista.id);
 
   // Trilha de aneis: no chao, subindo a rampa e acompanhando a curva.
-  for (let i = 0; i < 8; i++) no('anel', `Anel ${i + 1}`, { y: 1.7, z: 2 + i * 2.2 }, coletaveis.id);
+  // Comeca adiante do Ponto de Partida: um anel em cima de onde o personagem
+  // nasce seria um ponto de graca, antes de o jogador fazer qualquer coisa.
+  for (let i = 0; i < 8; i++) no('anel', `Anel ${i + 1}`, { y: 1.7, z: 5 + i * 2.2 }, coletaveis.id);
   for (let i = 0; i < 5; i++) {
     no('anel', `Anel da rampa ${i + 1}`, { y: 1.9 + i * 0.8, z: 18 + i * 1.6 }, coletaveis.id);
   }
@@ -69,6 +71,37 @@ export function faseDeExemplo(): SceneData {
       coletaveis.id,
     );
   }
+
+  // --- O que faz disto um jogo, e nao uma pista -----------------------------
+  //
+  // Com a M4, a fase de exemplo tem comeco, meio e fim: aneis para juntar,
+  // inimigos para desviar ou pisar, uma mola de atalho e uma meta que termina
+  // a fase. E a primeira coisa que a familia ve ao abrir o editor, entao ela
+  // precisa ser jogavel do inicio ao fim sem ninguem editar nada.
+  const jogo = no('grupo', 'Jogo', {});
+
+  // Um patrulheiro atravessado na reta do chao, e outro na parte suspensa.
+  // Guinada de 90 graus faz a ronda deles cruzar a pista, e nao acompanhar
+  // ela: dá para desviar pelos lados ou pisar em cima.
+  //
+  // A ronda do primeiro é deslocada para um lado de propósito. Centrada, ela
+  // varreria a pista inteira e viraria um pedágio: quem está aprendendo perde
+  // os anéis ali toda vez, sem ter tido escolha. Deslocada, ela deixa um lado
+  // livre — desviar, pular por cima ou encarar passa a ser decisão de quem
+  // joga, e é isso que faz um inimigo ser um inimigo, e não um imposto.
+  no('patrulheiro', 'Patrulheiro da reta', { x: 1.5, y: 0.5, z: 10, yaw: 90 }, jogo.id, {
+    Patroller: { range: 2, speed: 3.5 },
+  });
+  no('patrulheiro', 'Patrulheiro suspenso', { y: 4, z: 32, yaw: 90 }, jogo.id, {
+    Patroller: { range: 3, speed: 4.5 },
+  });
+
+  // Mola fora da linha de corrida: quem achar, sobe direto para o trecho
+  // suspenso sem passar pela rampa.
+  no('mola', 'Mola de atalho', { x: 3, y: 0.5, z: 12 }, jogo.id);
+
+  // A meta, em cima da plataforma solta do fim: chegar la exige o pulo.
+  no('meta', 'Meta', { x: 22, y: 2.5, z: 50 }, jogo.id);
 
   // Cenario dos dois lados, para dar referencia de velocidade.
   for (let i = 0; i < 10; i++) {

@@ -16,6 +16,8 @@
     "preview": "npm run preview --workspace @faisca/editor",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
+    "verificar:tipos": "tsc --noEmit -p tsconfig.json",
+    "verificar": "npm run typecheck && vitest run --reporter dot",
     "orcamento": "vitest run --reporter verbose packages/runtime/test/orcamento.test.ts",
     "site": "node scripts/montar-site.mjs"
   },

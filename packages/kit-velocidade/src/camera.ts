@@ -4,11 +4,17 @@ import {
   defineSystem,
   type Entity,
   type Input,
+  type PhysicsWorld,
   type System,
   Transform,
   view,
 } from '@faisca/runtime';
 import { aproximarAngulo, groundSpeed, SpeedCharacter } from './character.ts';
+
+/** Distancia minima do personagem, quando a parede empurra a camera. */
+const MIN_DISTANCE = 1.6;
+/** Folga entre a camera e a parede em que ela encostou. */
+const CAMERA_SKIN = 0.3;
 
 /**
  * Camera que segue — a do plano: acompanha sozinha, deixa o analogico direito
@@ -69,16 +75,23 @@ export function makeFollowCamera(entity: Entity, target: Entity): number {
 export interface FollowCameraOptions {
   camera: THREE.PerspectiveCamera;
   input: Input;
+  /**
+   * O mundo de colisao. Com ele, a camera para na parede em vez de atravessar.
+   * Sem ele, a camera funciona igual — so nao enxerga o cenario.
+   */
+  physics?: PhysicsWorld | null;
 }
 
 /** Um sistema por camera: ele dirige a camera do Three.js que recebe. */
 export function followCameraSystem(options: FollowCameraOptions): System {
   const { camera, input } = options;
+  const physics = options.physics ?? null;
   const cameras = view(FollowCamera);
 
   const alvoPos = new THREE.Vector3();
   const desejada = new THREE.Vector3();
   const olhar = new THREE.Vector3();
+  const paraCamera = new THREE.Vector3();
 
   return defineSystem({
     name: 'FollowCamera',
@@ -135,9 +148,42 @@ export function followCameraSystem(options: FollowCameraOptions): System {
           alvoPos.z - Math.cos(f.yaw[cs]) * distancia * cosP,
         );
 
+        // --- A camera nao atravessa parede ---------------------------------
+        //
+        // Sem isto, o loop do M2 vira uma tela azul: o personagem corre por
+        // dentro do aro, e a camera, nove unidades atras dele, fica dentro da
+        // parede do aro. Um raio do olho do personagem ate onde a camera quer
+        // ficar resolve — se tem cenario no caminho, ela para antes dele.
+        olhar.set(alvoPos.x, alvoPos.y + f.lookHeight[cs], alvoPos.z);
+        let colidiu = false;
+        if (physics) {
+          paraCamera.copy(desejada).sub(olhar);
+          const distancia = paraCamera.length();
+          if (distancia > 1e-4) {
+            paraCamera.divideScalar(distancia);
+            const batida = physics.castRay(olhar, paraCamera, distancia);
+            if (batida) {
+              // Uma folga para a camera nao encostar o nariz na parede e
+              // enxergar por dentro dela.
+              const livre = Math.max(MIN_DISTANCE, batida.distance - CAMERA_SKIN);
+              desejada.copy(olhar).addScaledVector(paraCamera, livre);
+              colidiu = true;
+            }
+          }
+        }
+
         if (f.initialized[cs] === 0) {
           camera.position.copy(desejada);
           f.initialized[cs] = 1;
+        } else if (
+          colidiu &&
+          camera.position.distanceToSquared(olhar) > desejada.distanceToSquared(olhar)
+        ) {
+          // Entrar na frente da parede e imediato: suavizar isso deixaria a
+          // camera dentro do cenario justamente durante o quadro em que o
+          // jogador precisa enxergar. Sair de perto, ao contrario, e suave —
+          // e o caminho de volta cai no ramo de baixo.
+          camera.position.copy(desejada);
         } else {
           // Suavizacao exponencial: independente da taxa de quadros, ao
           // contrario de um lerp com fator fixo, que gruda a 144 fps e arrasta
@@ -145,7 +191,6 @@ export function followCameraSystem(options: FollowCameraOptions): System {
           camera.position.lerp(desejada, 1 - Math.exp(-f.damping[cs] * frameTime));
         }
 
-        olhar.set(alvoPos.x, alvoPos.y + f.lookHeight[cs], alvoPos.z);
         camera.lookAt(olhar);
 
         // Abre o campo de visao com a velocidade: a sensacao de rapido vem

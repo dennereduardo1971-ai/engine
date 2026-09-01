@@ -3,10 +3,11 @@ import * as THREE from 'three';
 import {
   type Entity,
   InstancedBatch,
+  loadRapier,
   ObjectRegistry,
+  PhysicsWorld,
   Transform,
   World,
-  type UpdateContext,
 } from '@faisca/runtime';
 import { SpeedCharacter } from '@faisca/kit-velocidade';
 import {
@@ -16,7 +17,6 @@ import {
   localFromWorld,
   SceneAssembler,
   SceneDocument,
-  surfaceHeightAt,
   worldPlacement,
 } from '../src/index.ts';
 
@@ -24,11 +24,15 @@ import {
  * O montador e a fronteira entre editar e rodar. Nao da para testar o desenho
  * sem uma placa de video, mas da para testar o que importa: o documento e o
  * mundo ficam iguais, mudar um valor chega no componente vivo sem remontar a
- * fase, e o chao das pecas responde onde a peca esta.
+ * fase, e cada peca vira colisor no lugar certo.
  */
+
+// A fisica e wasm: precisa estar carregada antes de qualquer mundo existir.
+await loadRapier();
 class HospedeiroDeTeste implements AssemblerHost {
   readonly world = new World();
   readonly scene = new THREE.Group();
+  readonly physics = new PhysicsWorld();
   readonly batches: InstancedBatch[] = [];
   private readonly registry = new ObjectRegistry(this.scene);
 
@@ -165,64 +169,83 @@ describe('hot reload dos deslizadores', () => {
   });
 });
 
-describe('chao das pecas', () => {
-  it('a reta sustenta em cima dela e nao fora dela', () => {
+describe('colisor das pecas', () => {
+  /**
+   * De onde o personagem enxerga o chao: um raio de cima para baixo. E a
+   * mesma pergunta que o Kit Velocidade faz a cada passo, feita aqui de fora.
+   */
+  function alturaEm(x: number, z: number, de = 50): number | null {
+    const batida = host.physics.castRay({ x, y: de, z }, { x: 0, y: -1, z: 0 }, de + 20);
+    return batida ? batida.point.y : null;
+  }
+
+  it('a reta vira chao solido onde ela esta, e so ali', () => {
     doc.add('reta', { transform: { y: 4 } });
     montador.build();
 
     // A reta tem 8 por 8 e meia unidade de grossura.
-    expect(montador.groundHeight(0, 0)).toBe(4.5);
-    expect(montador.groundHeight(3.9, 3.9)).toBe(4.5);
-    expect(montador.groundHeight(9, 0)).toBe(0);
+    expect(alturaEm(0, 0)).toBeCloseTo(4.5, 4);
+    expect(alturaEm(3.9, 3.9)).toBeCloseTo(4.5, 4);
+    expect(alturaEm(9, 0)).toBe(null);
   });
 
   it('a rampa sobe de uma ponta a outra', () => {
     doc.add('rampa');
     montador.build();
 
-    expect(montador.groundHeight(0, -4)).toBeCloseTo(0, 5);
-    expect(montador.groundHeight(0, 0)).toBeCloseTo(2, 5);
-    expect(montador.groundHeight(0, 4)).toBeCloseTo(4, 5);
+    const pe = alturaEm(0, -4);
+    const meio = alturaEm(0, 0);
+    const topo = alturaEm(0, 4);
+    expect(pe).not.toBe(null);
+    expect(topo).not.toBe(null);
+    expect(meio!).toBeGreaterThan(pe!);
+    expect(topo!).toBeGreaterThan(meio!);
   });
 
-  it('a peca girada leva o chao junto', () => {
+  it('a peca girada leva o colisor junto', () => {
     // Uma plataforma de 4 por 4 girada 45 graus: o canto que antes estava
     // fora passa a estar dentro, e vice-versa.
     doc.add('plataforma', { transform: { yaw: 45 } });
     montador.build();
 
-    expect(montador.groundHeight(0, 2.6)).toBe(0.5);
-    expect(montador.groundHeight(1.9, 1.9)).toBe(0);
+    expect(alturaEm(0, 2.6)).not.toBe(null);
+    expect(alturaEm(1.9, 1.9)).toBe(null);
   });
 
   it('a curva sustenta dentro do arco e nao no miolo', () => {
     doc.add('curva');
     montador.build();
 
-    // Raios de 6 a 14, saindo do +X e indo para o -Z.
-    expect(montador.groundHeight(10, 0)).toBe(0.5);
-    expect(montador.groundHeight(0, -10)).toBe(0.5);
-    expect(montador.groundHeight(2, 0)).toBe(0);
-    expect(montador.groundHeight(0, 10)).toBe(0);
+    // Raios de 6 a 14, varrendo do +X ate o -Z. As amostras ficam dentro do
+    // arco de proposito: exatamente sobre a aresta que fecha a varredura, um
+    // raio vertical passa rente ao fio dos triangulos e pode escorregar entre
+    // eles. Isso e limite de malha, nao buraco na pista.
+    expect(alturaEm(10, -0.5)).toBeCloseTo(0.5, 4);
+    expect(alturaEm(7.1, -7.1)).toBeCloseTo(0.5, 4); // meio da curva
+    expect(alturaEm(0.5, -10)).toBeCloseTo(0.5, 4);
+    expect(alturaEm(2, -2)).toBe(null); // miolo, dentro do raio menor
+    expect(alturaEm(0, 10)).toBe(null); // fora da varredura
   });
 
-  it('nao cola o personagem no que esta acima da cabeca dele', () => {
-    doc.add('plataforma', { transform: { y: 10 } });
+  it('mover a peca no editor move o colisor junto', () => {
+    const no = doc.add('reta');
     montador.build();
+    expect(alturaEm(0, 0)).toBeCloseTo(0.5, 4);
 
-    expect(montador.groundHeight(0, 0, 1)).toBe(0);
-    expect(montador.groundHeight(0, 0, 20)).toBe(10.5);
+    // Sem remontar a fase: e o hot reload da secao 8 valendo tambem para a
+    // colisao. Um chao que continua onde a peca nao esta mais e um chao
+    // invisivel, e o pior bug que uma engine de plataforma pode ter.
+    doc.setTransform(no.id, { y: 6 });
+    expect(alturaEm(0, 0)).toBeCloseTo(6.5, 4);
   });
 
-  it('o sistema do chao escreve a altura debaixo do personagem', () => {
-    doc.add('inicio', { transform: { y: 2.5 } });
-    doc.add('reta', { transform: { y: 2 } });
+  it('apagar a peca tira o colisor', () => {
+    const no = doc.add('reta');
     montador.build();
-    const heroi = montador.startPlay();
-    const sistema = montador.groundSystem();
+    expect(alturaEm(0, 0)).not.toBe(null);
 
-    sistema.update({} as UpdateContext);
-    expect(SpeedCharacter.fields.groundY[SpeedCharacter.slotOf(heroi)]).toBe(2.5);
+    doc.remove(no.id);
+    expect(alturaEm(0, 0)).toBe(null);
   });
 });
 
@@ -238,14 +261,14 @@ describe('arvore e mundo', () => {
     expect(local.z).toBeCloseTo(5, 5);
   });
 
-  it('peca sem superficie nao sustenta ninguem', () => {
-    const anel = findPiece('anel')!;
-    const altura = surfaceHeightAt(
-      { piece: anel, x: 0, y: 0, z: 0, yaw: 0, sx: 1, sy: 1, sz: 1 },
-      0,
-      0,
-    );
-    expect(altura).toBeNull();
+  it('peca sem superficie nao vira colisor', () => {
+    // Anel e coletavel, nao chao: atravessar um anel correndo e o esperado.
+    expect(findPiece('anel')!.solid).toBe(false);
+    doc.add('anel');
+    montador.build();
+
+    const batida = host.physics.castRay({ x: 0, y: 20, z: 0 }, { x: 0, y: -1, z: 0 }, 40);
+    expect(batida).toBe(null);
   });
 });
 
@@ -278,7 +301,12 @@ describe('a fase de exemplo', () => {
     for (let x = 10.5; x < 18; x += 1) linha.push({ x, z: 50, altura: 4 });
 
     for (const ponto of linha) {
-      const altura = montador.groundHeight(ponto.x, ponto.z, 10);
+      const batida = host.physics.castRay(
+        { x: ponto.x, y: 20, z: ponto.z },
+        { x: 0, y: -1, z: 0 },
+        40,
+      );
+      const altura = batida ? batida.point.y : Number.NaN;
       expect(
         Math.abs(altura - ponto.altura),
         `sem chão em x=${ponto.x.toFixed(1)} z=${ponto.z.toFixed(1)}: achei ${altura}, esperava ${ponto.altura.toFixed(2)}`,

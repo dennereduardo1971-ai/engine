@@ -1,11 +1,11 @@
 import * as THREE from 'three';
 import {
+  type Collider,
   componentRegistry,
-  defineSystem,
   type Entity,
   type InstancedBatch,
+  type PhysicsWorld,
   placeAt,
-  type System,
   Transform,
   type World,
 } from '@faisca/runtime';
@@ -16,13 +16,7 @@ import {
   SpeedCharacter,
 } from '@faisca/kit-velocidade';
 import { type SceneChange, type SceneDocument, type SceneNode } from './documento.ts';
-import {
-  type Piece,
-  pieceGeometry,
-  pieceOrPlaceholder,
-  type Placement,
-  surfaceHeightAt,
-} from './pecas.ts';
+import { type Piece, pieceGeometry, pieceOrPlaceholder, scaledTrimesh } from './pecas.ts';
 import { worldPlacement, yawQuaternion } from './transformacoes.ts';
 
 /**
@@ -40,6 +34,8 @@ import { worldPlacement, yawQuaternion } from './transformacoes.ts';
 export interface AssemblerHost {
   readonly world: World;
   readonly scene: THREE.Object3D;
+  /** O mundo de colisao, ou null numa engine sem fisica. */
+  readonly physics: PhysicsWorld | null;
   attach(entity: Entity, object: THREE.Object3D): number;
   detach(entity: Entity): void;
   createBatch(
@@ -55,6 +51,8 @@ interface Built {
   piece: Piece;
   object: THREE.Object3D | null;
   batch: InstancedBatch | null;
+  /** Colisor da peca no Rapier, quando ela e solida. */
+  collider: Collider | null;
 }
 
 /** Onde o personagem nasce quando o teste comeca. */
@@ -66,16 +64,12 @@ export interface SpawnPoint {
 }
 
 const CAPACIDADE_PADRAO = 4_000;
-/** Degrau que o personagem sobe sozinho ao andar. */
-const DEGRAU = 1;
 
 export class SceneAssembler {
   private readonly built = new Map<string, Built>();
   private readonly byEntity = new Map<Entity, string>();
   private readonly batches = new Map<string, InstancedBatch>();
   private readonly materials = new Map<string, THREE.Material>();
-  private readonly placements: Placement[] = [];
-  private placementsStale = true;
   private unsubscribe: (() => void) | null = null;
 
   /** Personagem do teste ao vivo, ou -1 fora do teste. */
@@ -138,24 +132,6 @@ export class SceneAssembler {
     return typeof nome === 'string' ? nome : null;
   }
 
-  /**
-   * Altura do chao em (x, z), sem passar de `teto`.
-   *
-   * O teto e o que impede o personagem de ser colado no topo de uma
-   * plataforma que esta acima da cabeca dele. Nao ha parede nem teto de
-   * verdade: isso chega com o Rapier na M2.
-   */
-  groundHeight(x: number, z: number, teto = Number.POSITIVE_INFINITY): number {
-    this.refreshPlacements();
-    let melhor = 0;
-    for (const place of this.placements) {
-      const altura = surfaceHeightAt(place, x, z);
-      if (altura === null || altura > teto) continue;
-      if (altura > melhor) melhor = altura;
-    }
-    return melhor;
-  }
-
   /** Onde o ponto de partida esta. Sem ele, a origem. */
   spawnPoint(): SpawnPoint {
     const node = this.document.firstOfPiece('inicio');
@@ -209,37 +185,6 @@ export class SceneAssembler {
     return this.hero >= 0;
   }
 
-  /**
-   * Sistema que apoia o personagem nas pecas.
-   *
-   * Provisorio e assumido: ele so escreve a altura do chao debaixo do
-   * personagem, o que ja da para subir rampa, ficar em pe na plataforma e cair
-   * da beirada. Parede, teto e superficie grudenta sao Rapier, e sao a M2 —
-   * quando ela chegar, este sistema sai inteiro e o `groundY` do personagem
-   * sai junto.
-   */
-  groundSystem(): System {
-    return defineSystem({
-      name: 'ChaoDasPecas',
-      phase: 'logic',
-      // Antes do personagem (que roda em -20): a altura tem que estar escrita
-      // quando ele for decidir se esta no chao.
-      order: -30,
-      update: () => {
-        if (this.hero < 0) return;
-        const ts = Transform.slotOf(this.hero);
-        const cs = SpeedCharacter.slotOf(this.hero);
-        if (ts < 0 || cs < 0) return;
-        const t = Transform.fields;
-        SpeedCharacter.fields.groundY[cs] = this.groundHeight(
-          t.x[ts],
-          t.z[ts],
-          t.y[ts] + DEGRAU,
-        );
-      },
-    });
-  }
-
   // --- Reagir ao documento --------------------------------------------------
 
   private apply(change: SceneChange): void {
@@ -256,7 +201,6 @@ export class SceneAssembler {
       case 'parent':
         // Mover o pai move o galho inteiro.
         for (const node of this.document.branch(change.id)) this.place(node);
-        this.placementsStale = true;
         break;
       case 'fields':
         this.applyFields(change.id, change.component);
@@ -281,7 +225,14 @@ export class SceneAssembler {
     if (this.built.has(node.id)) this.destroy(node.id);
     const piece = pieceOrPlaceholder(node.piece);
     const entity = this.host.world.create();
-    const built: Built = { node: node.id, entity, piece, object: null, batch: null };
+    const built: Built = {
+      node: node.id,
+      entity,
+      piece,
+      object: null,
+      batch: null,
+      collider: null,
+    };
 
     if (piece.mesh.kind !== 'grupo' && node.visible) {
       if (piece.instanced) {
@@ -299,18 +250,20 @@ export class SceneAssembler {
     this.byEntity.set(entity, node.id);
     this.place(node);
     this.applyFields(node.id, null);
-    this.placementsStale = true;
   }
 
   private destroy(nodeId: string): void {
     const built = this.built.get(nodeId);
     if (!built) return;
+    if (built.collider) {
+      this.host.physics?.removeCollider(built.collider);
+      built.collider = null;
+    }
     built.batch?.release(built.entity);
     if (built.object) this.host.detach(built.entity);
     this.host.world.destroy(built.entity);
     this.byEntity.delete(built.entity);
     this.built.delete(nodeId);
-    this.placementsStale = true;
   }
 
   /** Escreve a posicao de mundo do no no Transform da entidade. */
@@ -334,6 +287,36 @@ export class SceneAssembler {
     f.sx[ts] = place.sx;
     f.sy[ts] = place.sy;
     f.sz[ts] = place.sz;
+
+    this.rebuildCollider(node, built);
+  }
+
+  /**
+   * Refaz o colisor da peca no lugar onde ela esta agora.
+   *
+   * Colisor de malha nao tem escala propria no Rapier — a escala vive nos
+   * vertices. Entao mover, girar ou redimensionar uma peca no editor refaz o
+   * colisor inteiro, e nao remenda o antigo. Custa uma malha por mexida, e
+   * paga com a garantia de que o que se ve e o que se colide: uma pista que
+   * parece uma coisa e colide como outra e o pior bug possivel numa engine de
+   * plataforma.
+   */
+  private rebuildCollider(node: SceneNode, built: Built): void {
+    const physics = this.host.physics;
+    if (built.collider) {
+      physics?.removeCollider(built.collider);
+      built.collider = null;
+    }
+    if (!physics || !node.visible) return;
+
+    const place = worldPlacement(this.document, node);
+    const malha = scaledTrimesh(built.piece, place.sx, place.sy, place.sz);
+    if (!malha) return;
+
+    built.collider = physics.addTrimesh(malha.vertices, malha.indices, {
+      position: { x: place.x, y: place.y, z: place.z },
+      rotation: yawQuaternion(place.yaw),
+    });
   }
 
   /**
@@ -362,18 +345,6 @@ export class SceneAssembler {
     for (const [nome, valores] of Object.entries(node.fields)) {
       if (component !== null && nome !== component) continue;
       applyFieldsTo(built.entity, valores, nome);
-    }
-  }
-
-  private refreshPlacements(): void {
-    if (!this.placementsStale) return;
-    this.placementsStale = false;
-    this.placements.length = 0;
-    for (const node of this.document.nodes) {
-      const piece = pieceOrPlaceholder(node.piece);
-      if (piece.surface === 'nenhuma' || !node.visible) continue;
-      const place = worldPlacement(this.document, node);
-      this.placements.push({ piece, ...place });
     }
   }
 
@@ -415,7 +386,6 @@ export class SceneAssembler {
   private clear(): void {
     for (const nodeId of [...this.built.keys()]) this.destroy(nodeId);
     for (const batch of this.batches.values()) batch.clear();
-    this.placementsStale = true;
   }
 }
 

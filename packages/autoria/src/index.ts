@@ -30,12 +30,12 @@ export {
   pieceBounds,
   pieceGeometry,
   pieceOrPlaceholder,
-  surfaceHeightAt,
+  pieceTrimesh,
+  scaledTrimesh,
   type MeshKind,
   type MeshSpec,
   type Piece,
-  type Placement,
-  type SurfaceKind,
+  type TrimeshData,
 } from './pecas.ts';
 
 export {

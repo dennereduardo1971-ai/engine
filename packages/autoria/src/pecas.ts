@@ -13,23 +13,21 @@ import * as THREE from 'three';
  * e o montador.
  */
 
-export type MeshKind = 'grupo' | 'caixa' | 'rampa' | 'curva' | 'anel' | 'cone' | 'marco';
-
-/**
- * Como a peca sustenta o personagem no teste ao vivo.
- *
- * Isto e provisorio e esta assumido: e uma consulta de altura, nao um colisor.
- * A M2 troca tudo por Rapier, que traz parede, rampa de verdade e a superficie
- * grudenta do loop. Ate la, da para andar em cima das pecas — que e o que a
- * M3 precisa para "testar na hora" significar alguma coisa.
- */
-export type SurfaceKind = 'nenhuma' | 'caixa' | 'rampa' | 'setor';
+export type MeshKind =
+  | 'grupo'
+  | 'caixa'
+  | 'rampa'
+  | 'curva'
+  | 'loop'
+  | 'anel'
+  | 'cone'
+  | 'marco';
 
 export interface MeshSpec {
   kind: MeshKind;
   /** Largura (X), altura (Y) e comprimento (Z), em unidades. */
   size: [number, number, number];
-  /** Curva: raio de dentro, raio de fora e quanto ela vira, em graus. */
+  /** Curva e loop: raio de dentro, raio de fora e quanto vira, em graus. */
   inner?: number;
   outer?: number;
   arc?: number;
@@ -55,7 +53,14 @@ export interface Piece {
   instanced: boolean;
   /** Quantas cabem no lote instanciado. So vale com `instanced`. */
   capacity?: number;
-  surface: SurfaceKind;
+  /**
+   * A peca tem colisor.
+   *
+   * Desde a M2 isso e literal: a malha da peca vira um colisor de malha no
+   * Rapier, do jeito que ela e. E por isso que o loop funciona — nao ha
+   * aproximacao por caixas no meio do caminho.
+   */
+  solid: boolean;
   /** Altura em que a peca nasce quando e colocada. */
   dropY: number;
   /** Componentes que a peca leva, com os valores de fabrica dela. */
@@ -79,7 +84,7 @@ export const PIECES: readonly Piece[] = [
     mesh: { kind: 'grupo', size: [0, 0, 0] },
     color: 0x8ea2c6,
     instanced: false,
-    surface: 'nenhuma',
+    solid: false,
     dropY: 0,
     components: {},
   },
@@ -92,7 +97,7 @@ export const PIECES: readonly Piece[] = [
     mesh: { kind: 'marco', size: [1, 3, 1] },
     color: 0x4ade80,
     instanced: false,
-    surface: 'nenhuma',
+    solid: false,
     dropY: 0,
     unique: true,
     // Os deslizadores do Personagem Veloz e da camera moram no ponto de
@@ -109,7 +114,7 @@ export const PIECES: readonly Piece[] = [
     mesh: { kind: 'caixa', size: [8, 0.5, 8] },
     color: 0x3f4c70,
     instanced: false,
-    surface: 'caixa',
+    solid: true,
     dropY: 0,
     components: {},
   },
@@ -122,7 +127,7 @@ export const PIECES: readonly Piece[] = [
     mesh: { kind: 'rampa', size: [8, 4, 8] },
     color: 0x46557d,
     instanced: false,
-    surface: 'rampa',
+    solid: true,
     dropY: 0,
     components: {},
   },
@@ -135,7 +140,7 @@ export const PIECES: readonly Piece[] = [
     mesh: { kind: 'curva', size: [1, 0.5, 1], inner: 6, outer: 14, arc: 90 },
     color: 0x3f4c70,
     instanced: false,
-    surface: 'setor',
+    solid: true,
     dropY: 0,
     components: {},
   },
@@ -148,7 +153,7 @@ export const PIECES: readonly Piece[] = [
     mesh: { kind: 'caixa', size: [4, 0.5, 4] },
     color: 0x53639a,
     instanced: false,
-    surface: 'caixa',
+    solid: true,
     dropY: 0,
     components: {},
   },
@@ -161,7 +166,7 @@ export const PIECES: readonly Piece[] = [
     mesh: { kind: 'caixa', size: [2, 2, 2] },
     color: 0x8a6b46,
     instanced: true,
-    surface: 'caixa',
+    solid: true,
     dropY: 0,
     components: {},
   },
@@ -175,8 +180,26 @@ export const PIECES: readonly Piece[] = [
     color: 0xf5c542,
     instanced: true,
     capacity: 20_000,
-    surface: 'nenhuma',
+    solid: false,
     dropY: 1.2,
+    components: {},
+  },
+  {
+    id: 'loop',
+    label: 'Loop',
+    icon: '🔁',
+    group: 'pista',
+    hint: 'O loop-the-loop. Entre a toda: devagar, ele solta no meio.',
+    // O aro para de girar 45 graus antes de fechar. Um loop fechado, encostado
+    // no chao, *nao tem entrada*: o pedaco que desce para a saida passa rente
+    // ao chao bem no caminho de quem esta chegando, e barra a passagem antes
+    // que ele alcance a base. O vao e por onde se entra, e a saida vira um
+    // pulinho de duas unidades.
+    mesh: { kind: 'loop', size: [8, 0.6, 0], inner: 7, arc: 315 },
+    color: 0x46557d,
+    instanced: false,
+    solid: true,
+    dropY: 0,
     components: {},
   },
   {
@@ -188,7 +211,7 @@ export const PIECES: readonly Piece[] = [
     mesh: { kind: 'cone', size: [2.4, 5, 2.4] },
     color: 0x2f7d4f,
     instanced: true,
-    surface: 'nenhuma',
+    solid: false,
     dropY: 0,
     components: {},
   },
@@ -216,7 +239,7 @@ export function pieceOrPlaceholder(id: string): Piece {
       mesh: { kind: 'caixa', size: [2, 2, 2] },
       color: 0xb45cf0,
       instanced: false,
-      surface: 'nenhuma',
+      solid: false,
       dropY: 0,
       components: {},
     }
@@ -280,6 +303,30 @@ function buildGeometry(mesh: MeshSpec): THREE.BufferGeometry {
       geometry.rotateX(-Math.PI / 2);
       return geometry;
     }
+    case 'loop': {
+      // Uma faixa de pista girando num plano vertical. O angulo zero e a base,
+      // encostada no chao, e o aro sobe andando para o -Z — a mesma direcao em
+      // que uma reta corre.
+      const inner = mesh.inner ?? 7;
+      const outer = inner + (h || 0.6);
+      const volta = THREE.MathUtils.degToRad(mesh.arc ?? 315);
+      const forma = new THREE.Shape();
+      const inicio = -Math.PI / 2;
+      forma.absarc(0, 0, inner, inicio, inicio + volta, false);
+      forma.absarc(0, 0, outer, inicio + volta, inicio, true);
+      const geometry = new THREE.ExtrudeGeometry(forma, {
+        depth: w,
+        bevelEnabled: false,
+        curveSegments: 64,
+      });
+      geometry.translate(0, 0, -w / 2);
+      // O X da forma vira o Z do mundo, e a espessura da extrusao vira a
+      // largura da pista em X.
+      geometry.rotateY(Math.PI / 2);
+      // Sobe o aro para a base dele encostar no chao da peca.
+      geometry.translate(0, inner, 0);
+      return geometry;
+    }
     case 'anel': {
       // 5 x 12 segmentos: um anel e visto de longe e em movimento, e mais que
       // isso e triangulo gasto sem ninguem ver.
@@ -329,62 +376,59 @@ export function pieceBounds(piece: Piece): THREE.Box3 {
   return box ? box.clone() : new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
 }
 
-// --- Chao pisavel -----------------------------------------------------------
+// --- Colisor ----------------------------------------------------------------
 
-export interface Placement {
-  piece: Piece;
-  x: number;
-  y: number;
-  z: number;
-  /** Guinada em radianos. */
-  yaw: number;
-  sx: number;
-  sy: number;
-  sz: number;
+export interface TrimeshData {
+  vertices: Float32Array;
+  indices: Uint32Array;
 }
 
+const trimeshCache = new Map<string, TrimeshData>();
+
 /**
- * Altura do topo da peca em (wx, wz), ou `null` se o ponto esta fora dela.
+ * A malha da peca no formato que o Rapier entende, criada uma vez e
+ * reaproveitada.
  *
- * Provisorio, e de proposito: e uma consulta de altura, nao um colisor. Nao
- * existe parede, nao existe teto e nao existe superficie grudenta. Tudo isso
- * chega com o Rapier na M2 — aqui so precisa dar para subir a rampa e ficar em
- * pe na plataforma enquanto se monta a fase.
+ * Malha, e nao caixa: a rampa, a curva e o loop *sao* a forma deles, e trocar
+ * isso por caixas seria perder exatamente a superficie que o personagem
+ * precisa seguir. Malha nao serve para corpo que se move — mas pista nao se
+ * move.
  */
-export function surfaceHeightAt(place: Placement, wx: number, wz: number): number | null {
-  const { piece } = place;
-  if (piece.surface === 'nenhuma') return null;
+export function pieceTrimesh(piece: Piece): TrimeshData | null {
+  if (!piece.solid || piece.mesh.kind === 'grupo') return null;
+  const cached = trimeshCache.get(piece.id);
+  if (cached) return cached;
 
-  // Ponto no espaco da peca: desfaz a posicao e a guinada.
-  const dx = wx - place.x;
-  const dz = wz - place.z;
-  const cos = Math.cos(place.yaw);
-  const sin = Math.sin(place.yaw);
-  const lx = dx * cos - dz * sin;
-  const lz = dx * sin + dz * cos;
+  const geometry = pieceGeometry(piece);
+  const posicoes = geometry.getAttribute('position');
+  const vertices = new Float32Array(posicoes.array);
+  const index = geometry.getIndex();
+  const indices = index
+    ? new Uint32Array(index.array)
+    : // Geometria sem indice: os vertices ja vem em ordem, tres a tres.
+      Uint32Array.from({ length: posicoes.count }, (_valor, i) => i);
 
-  const [w, h, d] = piece.mesh.size;
+  const data: TrimeshData = { vertices, indices };
+  trimeshCache.set(piece.id, data);
+  return data;
+}
 
-  if (piece.surface === 'caixa' || piece.surface === 'rampa') {
-    const meiaLargura = (w * place.sx) / 2;
-    const meioComprimento = (d * place.sz) / 2;
-    if (Math.abs(lx) > meiaLargura || Math.abs(lz) > meioComprimento) return null;
-    const altura = h * place.sy;
-    if (piece.surface === 'caixa') return place.y + altura;
-    // A rampa sobe andando para o +Z dela.
-    const subida = (lz + meioComprimento) / (meioComprimento * 2);
-    return place.y + altura * Math.min(1, Math.max(0, subida));
+/** A mesma malha, com a escala do no ja aplicada aos vertices. */
+export function scaledTrimesh(
+  piece: Piece,
+  sx: number,
+  sy: number,
+  sz: number,
+): TrimeshData | null {
+  const base = pieceTrimesh(piece);
+  if (!base) return null;
+  if (sx === 1 && sy === 1 && sz === 1) return base;
+  // O Rapier nao escala colisor de malha: quem escala e a lista de vertices.
+  const vertices = new Float32Array(base.vertices.length);
+  for (let i = 0; i < base.vertices.length; i += 3) {
+    vertices[i] = base.vertices[i] * sx;
+    vertices[i + 1] = base.vertices[i + 1] * sy;
+    vertices[i + 2] = base.vertices[i + 2] * sz;
   }
-
-  // Setor de coroa (a curva): raio dentro da faixa e angulo dentro do arco.
-  const inner = (piece.mesh.inner ?? 0) * place.sx;
-  const outer = (piece.mesh.outer ?? 0) * place.sx;
-  const raio = Math.hypot(lx, lz);
-  if (raio < inner || raio > outer) return null;
-  const arco = THREE.MathUtils.degToRad(piece.mesh.arc ?? 90);
-  // A curva sai do +X indo para o -Z (e assim que a geometria foi deitada).
-  let angulo = Math.atan2(-lz, lx);
-  if (angulo < 0) angulo += Math.PI * 2;
-  if (angulo > arco) return null;
-  return place.y + h * place.sy;
+  return { vertices, indices: base.indices };
 }

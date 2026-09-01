@@ -10,6 +10,8 @@ import { QualitySupervisor } from './render/quality.ts';
 import { InstancedBatch, instancedSyncSystem } from './render/instancing.ts';
 import { ObjectRegistry, visualSyncSystem } from './render/scene-sync.ts';
 import { transformHistorySystem, velocitySystem } from './scene/systems.ts';
+import { PhysicsWorld, type PhysicsOptions } from './physics/world.ts';
+import { BodyRegistry, physicsStepSystem, physicsSyncSystem } from './physics/components.ts';
 
 export interface EngineOptions {
   canvas: HTMLCanvasElement;
@@ -21,6 +23,13 @@ export interface EngineOptions {
   adaptiveQuality?: boolean;
   /** Opcoes da entrada (mapeamento de controles, alvo dos eventos). */
   input?: InputOptions;
+  /**
+   * Liga a fisica. Padrao: ligada.
+   *
+   * Exige `await loadRapier()` antes de construir a engine — o wasm do Rapier
+   * precisa estar carregado, e o construtor nao pode esperar.
+   */
+  physics?: boolean | PhysicsOptions;
 }
 
 /**
@@ -41,6 +50,9 @@ export class Engine {
   readonly objects: ObjectRegistry;
   readonly loop: Loop;
   readonly input: Input;
+  /** O mundo de fisica, ou null se a engine foi criada sem ela. */
+  readonly physics: PhysicsWorld | null;
+  readonly bodies: BodyRegistry | null;
 
   private readonly batches: InstancedBatch[] = [];
   private logicMs = 0;
@@ -64,11 +76,23 @@ export class Engine {
       onRender: (alpha, frameTime) => this.renderFrame(alpha, frameTime),
     });
 
+    if (options.physics === false) {
+      this.physics = null;
+      this.bodies = null;
+    } else {
+      this.physics = new PhysicsWorld(options.physics === true ? {} : options.physics);
+      this.bodies = new BodyRegistry(this.physics);
+    }
+
     // Sistemas de fundacao, sempre presentes.
     this.add(transformHistorySystem());
     this.add(velocitySystem());
     this.add(visualSyncSystem(this.objects));
     this.add(instancedSyncSystem(this.batches));
+    if (this.physics && this.bodies) {
+      this.add(physicsStepSystem(this.physics));
+      this.add(physicsSyncSystem(this.bodies));
+    }
 
     // Degrau de qualidade que ja existe no M0: escala de renderizacao.
     // Sombras, particulas e pos-processamento entram nos degraus certos
@@ -135,6 +159,8 @@ export class Engine {
     this.scheduler.stopAll(this.world);
     for (const batch of this.batches) batch.dispose();
     this.renderer.dispose();
+    this.bodies?.clear();
+    this.physics?.dispose();
   }
 
   private fixedStep(step: number, elapsed: number, dt: number): void {

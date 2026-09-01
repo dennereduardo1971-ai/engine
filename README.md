@@ -17,18 +17,33 @@ O jogo de referência é um **Sonic 3D**: velocidade, momentum, loops, molas, ra
 
 ## Estado
 
-**M0, M1 e M3 entregues.** Uma janela 3D abre, o laço de passo fixo gira, o painel de
+**M0, M1, M2 e M3 entregues.** Uma janela 3D abre, o laço de passo fixo gira, o painel de
 performance responde a pergunta do M0 — *esta máquina aguenta 60 fps?* — com número na
 mão, e tem um bonequinho que anda com o controle de Xbox, com câmera que segue sozinha.
 
-E agora tem **editor**: `npm run dev` abre uma tela onde dá para montar uma pista com
-peças, mexer nos valores num inspetor, apertar **Jogar** e correr na fase que você acabou
-de montar — sem sair da tela, sem recompilar nada.
+Tem **editor**: `npm run dev` abre uma tela onde dá para montar uma pista com peças, mexer
+nos valores num inspetor, apertar **Jogar** e correr na fase que você acabou de montar —
+sem sair da tela, sem recompilar nada.
 
-A **M2** — Rapier: gravidade, rampas de verdade, momentum e superfície grudenta — ficou
-para a próxima fatia. É ela que traz o loop-the-loop. Enquanto isso, o chão das peças no
-teste ao vivo é uma consulta de altura, e não um colisor: dá para subir a rampa e ficar em
-pé na plataforma, mas não há parede nem teto.
+E, com a **M2**, tem **loop-the-loop**. A física é o Rapier de verdade: cada peça vira um
+colisor de malha, do jeito que ela é desenhada. O personagem passou a ter um *"para cima"
+próprio*, alinhado à normal do chão — é isso, e só isso, que faz loop, parede e corkscrew
+funcionarem, porque correr no teto e correr no chão viram o mesmo código. A gravidade, no
+chão, entra como inclinação: descer ganha velocidade e subir perde, sem nenhum caso
+especial para rampa. E ela só puxa para fora da superfície quando a velocidade cai abaixo
+do limite de aderência — o instante exato em que o Sonic despenca do loop se estiver
+devagar.
+
+Próxima fatia: **M4** — anéis, molas, inimigo patrulheiro, meta, HUD e save: *um jogo
+completo, do início ao fim*.
+
+### Arestas conhecidas
+
+- Dentro do loop, a câmera para na parede em vez de atravessá-la, mas o enquadramento
+  ainda é ruim: o aro fica entre ela e o personagem. Câmera que não sobe junto no loop é
+  trabalho do Kit Velocidade, ainda por fazer.
+- O pacote do jogo passou de 0,5 MB para 2,7 MB, quase tudo wasm do Rapier embutido. Cabe
+  folgado nos 15 MB que o plano dá para um jogo publicado, mas é o piso agora.
 
 ## Como rodar
 

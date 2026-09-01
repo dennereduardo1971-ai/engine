@@ -89,11 +89,14 @@ export class Editor {
     // Os sistemas do jogo ficam registrados o tempo todo. Fora do teste nao
     // existe personagem nenhum, entao eles nao custam nada — e isso poupa
     // montar e desmontar o agendador a cada play.
-    this.engine.add(this.assembler.groundSystem());
+    const physics = this.engine.physics;
+    if (!physics) throw new Error('Faísca: o editor precisa da física ligada.');
     this.engine.add(
-      speedCharacterSystem({ camera: this.engine.camera, input: this.engine.input }),
+      speedCharacterSystem({ camera: this.engine.camera, input: this.engine.input, physics }),
     );
-    this.engine.add(followCameraSystem({ camera: this.engine.camera, input: this.engine.input }));
+    this.engine.add(
+      followCameraSystem({ camera: this.engine.camera, input: this.engine.input, physics }),
+    );
     this.engine.add(
       defineSystem({
         name: 'ViewportDoEditor',

@@ -53,5 +53,33 @@ export { InstancedBatch, instancedSyncSystem } from './render/instancing.ts';
 export { Transform, Velocity, Visual, Instanced, placeAt } from './scene/components.ts';
 export { transformHistorySystem, velocitySystem } from './scene/systems.ts';
 
+export {
+  loadRapier,
+  rapier,
+  rapierReady,
+  type Collider,
+  type Rapier,
+  type RigidBody,
+  type Shape,
+} from './physics/rapier.ts';
+export {
+  DEFAULT_GRAVITY,
+  PhysicsWorld,
+  type Hit,
+  type PhysicsOptions,
+  type Placement,
+  type Quat,
+  type Vec3,
+} from './physics/world.ts';
+export {
+  Body,
+  BodyRegistry,
+  BODY_DYNAMIC,
+  BODY_FIXED,
+  BODY_KINEMATIC,
+  physicsStepSystem,
+  physicsSyncSystem,
+} from './physics/components.ts';
+
 export { Engine, type EngineOptions } from './engine.ts';
 export { PerfHud } from './debug/perf-hud.ts';

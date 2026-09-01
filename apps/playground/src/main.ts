@@ -4,11 +4,13 @@ import {
   defineComponent,
   defineSystem,
   Engine,
+  loadRapier,
   PerfHud,
   placeAt,
   Transform,
   view,
   type Entity,
+  type PhysicsWorld,
 } from '@faisca/runtime';
 import {
   followCameraSystem,
@@ -20,16 +22,24 @@ import {
 } from '@faisca/kit-velocidade';
 
 /**
- * Cena de referencia — M1.
+ * Cena de referencia — M2.
  *
  * Um bonequinho que anda com o controle de Xbox (ou com o teclado), uma camera
- * que segue sozinha e um campo de aneis instanciados. Ela responde as duas
- * perguntas das duas primeiras fatias do plano ao mesmo tempo: "da para andar
- * com o controle?" e "esta maquina aguenta 60 fps?".
+ * que segue sozinha, um campo de aneis instanciados e — a entrega desta fatia
+ * — uma rampa e um loop de verdade, com colisor de malha no Rapier.
+ *
+ * Ela responde de uma vez as perguntas das tres primeiras fatias do plano:
+ * "esta maquina aguenta 60 fps?", "da para andar com o controle?" e "da para
+ * correr num loop e sair dele?".
  */
+
+// O construtor da engine e sincrono e cria o mundo de fisica na hora; o wasm
+// do Rapier precisa ja estar em memoria quando ele roda.
+await loadRapier();
 
 const canvas = document.querySelector<HTMLCanvasElement>('#tela')!;
 const engine = new Engine({ canvas, clearColor: 0x0e1117 });
+const fisica = engine.physics as PhysicsWorld;
 
 engine.scene.fog = new THREE.Fog(0x0e1117, 60, 240);
 
@@ -55,18 +65,99 @@ const grade = new THREE.GridHelper(400, 100, 0x5570a8, 0x36436a);
 grade.position.y = 0.02;
 engine.scene.add(grade);
 
+// O chao visto e o chao colidido. A caixa tem o topo exatamente em y = 0.
+fisica.addBox({ x: 200, y: 1, z: 200 }, { position: { x: 0, y: -1, z: 0 } });
+
+// --- Rampa e loop: a entrega do M2 ------------------------------------------
+
+const materialPista = new THREE.MeshLambertMaterial({
+  color: 0x38507e,
+  side: THREE.DoubleSide,
+});
+
+/** Uma rampa: uma caixa inclinada, com o pe encostando no chao. */
+// Graus negativos sobem andando para +Z, na mesma direcao do loop.
+function porRampa(x: number, z: number, graus: number, comprimento = 26): void {
+  const angulo = THREE.MathUtils.degToRad(graus);
+  const meia = 0.4;
+  const giro = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), angulo);
+  // Desce meia espessura ao longo da propria normal, para o topo da rampa —
+  // e nao o meio dela — passar pela origem escolhida.
+  const centro = new THREE.Vector3(0, -meia, 0).applyQuaternion(giro).add(
+    new THREE.Vector3(x, 0, z),
+  );
+
+  const malha = new THREE.Mesh(
+    new THREE.BoxGeometry(14, meia * 2, comprimento),
+    materialPista,
+  );
+  malha.position.copy(centro);
+  malha.quaternion.copy(giro);
+  engine.scene.add(malha);
+
+  fisica.addBox(
+    { x: 7, y: meia, z: comprimento / 2 },
+    { position: { x: centro.x, y: centro.y, z: centro.z }, rotation: giro },
+  );
+}
+
+/**
+ * A superficie de dentro de um loop.
+ *
+ * Uma tira de triangulos seguindo o aro, tangente ao chao na base. Os ultimos
+ * 45 graus ficam de fora de proposito: um aro completo encostado no chao *nao
+ * tem entrada* — o quarto que desce para a saida passa rente ao chao bem no
+ * caminho de quem esta chegando, e barra a passagem antes da base.
+ */
+function porLoop(x: number, z: number, raio = 8, largura = 9, segmentos = 96): void {
+  const vertices: number[] = [];
+  const indices: number[] = [];
+  const volta = THREE.MathUtils.degToRad(360 - 45);
+  for (let i = 0; i <= segmentos; i++) {
+    const angulo = (i / segmentos) * volta;
+    // Angulo 0 e a base, encostada no chao, e o aro sobe andando para +Z —
+    // que e para onde a camera olha quando a fase comeca. Quem empurra o
+    // analogico para frente no primeiro segundo entra no loop.
+    const zi = z + Math.sin(angulo) * raio;
+    const y = raio - Math.cos(angulo) * raio;
+    vertices.push(x - largura / 2, y, zi, x + largura / 2, y, zi);
+    if (i < segmentos) {
+      const a = i * 2;
+      indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+    }
+  }
+
+  const posicoes = new Float32Array(vertices);
+  const lista = new Uint32Array(indices);
+
+  const geometria = new THREE.BufferGeometry();
+  geometria.setAttribute('position', new THREE.BufferAttribute(posicoes, 3));
+  geometria.setIndex(new THREE.BufferAttribute(lista, 1));
+  geometria.computeVertexNormals();
+  engine.scene.add(new THREE.Mesh(geometria, materialPista));
+
+  fisica.addTrimesh(posicoes, lista);
+}
+
+porLoop(0, 22);
+porRampa(26, 18, -18);
+
 
 // --- O bonequinho -----------------------------------------------------------
 const heroi = engine.world.create();
-placeAt(heroi, 0, 0, 0);
 const heroiSlot = makeSpeedCharacter(heroi);
+// A origem da entidade e o centro da bola que colide: ela nasce um raio acima
+// do chao, senao o primeiro passo comeca dentro dele.
+placeAt(heroi, 0, SpeedCharacter.fields.radius[heroiSlot], 0);
 
 const corpo = new THREE.Group();
 const capsula = new THREE.Mesh(
   new THREE.CapsuleGeometry(0.55, 1.1, 4, 12),
   new THREE.MeshLambertMaterial({ color: 0x4f7cff }),
 );
-capsula.position.y = 1.1;
+// O corpo visto pendurado na bola de colisao: o pe dele encosta onde ela
+// encosta.
+capsula.position.y = 0.5;
 corpo.add(capsula);
 // Um bico na frente, so para dar para ver para onde ele esta virado.
 const bico = new THREE.Mesh(
@@ -74,16 +165,18 @@ const bico = new THREE.Mesh(
   new THREE.MeshLambertMaterial({ color: 0xffd166 }),
 );
 bico.rotation.x = Math.PI / 2;
-bico.position.set(0, 1.2, 0.62);
+bico.position.set(0, 0.6, 0.62);
 corpo.add(bico);
 engine.attach(heroi, corpo);
 
-engine.add(speedCharacterSystem({ camera: engine.camera, input: engine.input }));
+engine.add(speedCharacterSystem({ camera: engine.camera, input: engine.input, physics: fisica }));
 
 // --- Camera que segue -------------------------------------------------------
 const cameraEntidade = engine.world.create();
 makeFollowCamera(cameraEntidade, heroi);
-engine.add(followCameraSystem({ camera: engine.camera, input: engine.input }));
+engine.add(
+  followCameraSystem({ camera: engine.camera, input: engine.input, physics: fisica }),
+);
 
 // Clicar trava o ponteiro: so assim o mouse vira controle de camera em vez de
 // cursor. Esc devolve.
@@ -234,5 +327,14 @@ botaoAuto.addEventListener('click', () => {
 montarTrilhas();
 engine.start();
 
-// Deixa a engine a mao no console do navegador, para mexer ao vivo.
-Object.assign(globalThis, { faisca: engine, heroi, espalharAneis, limparAneis });
+// Deixa a engine a mao no console do navegador, para mexer ao vivo:
+//   faisca.profiler.fps
+//   SpeedCharacter.fields.maxSpeed[SpeedCharacter.slotOf(heroi)] = 40
+Object.assign(globalThis, {
+  faisca: engine,
+  heroi,
+  Transform,
+  SpeedCharacter,
+  espalharAneis,
+  limparAneis,
+});

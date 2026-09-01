@@ -1,0 +1,448 @@
+/*
+ * Tema escuro de estudio, como a secao 8 do plano pede. O Modo Crianca, claro
+ * e colorido, e a M12 — e vai ser outro tema em cima da mesma interface.
+ */
+:root {
+  color-scheme: dark;
+  --fundo: #0e1117;
+  --painel: #151a24;
+  --painel-alto: #1c2230;
+  --borda: rgba(255, 255, 255, 0.09);
+  --texto: #e6e9f0;
+  --apagado: rgba(230, 233, 240, 0.55);
+  --marca: #4f7cff;
+  --bom: #4ade80;
+  --ruim: #f87171;
+  --raio: 8px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#raiz {
+  margin: 0;
+  height: 100%;
+  background: var(--fundo);
+  color: var(--texto);
+  font: 13px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  overflow: hidden;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* --- Barra ---------------------------------------------------------------- */
+
+.barra {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 0 12px;
+  background: var(--painel);
+  border-bottom: 1px solid var(--borda);
+}
+
+.barra .marca {
+  font-size: 20px;
+}
+
+.barra .texto {
+  width: 180px;
+}
+
+.barra .botoes {
+  display: flex;
+  gap: 4px;
+}
+
+.barra .recado {
+  flex: 1;
+  text-align: right;
+  color: var(--apagado);
+  font-size: 12px;
+  padding-left: 10px;
+}
+
+.barra .teste {
+  margin-left: 6px;
+  padding-left: 12px;
+  border-left: 1px solid var(--borda);
+}
+
+button {
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--texto);
+  background: var(--painel-alto);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: #273046;
+}
+
+button:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+
+button.jogar {
+  background: #2f6f4f;
+  border-color: #48b07c;
+}
+
+button.parar {
+  background: #6f2f37;
+  border-color: #b04848;
+}
+
+button.perigo {
+  color: #ffd7d7;
+  background: #46232a;
+  border-color: #7d3a44;
+}
+
+button.link {
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--marca);
+  text-decoration: underline;
+  font-size: 11px;
+}
+
+/* --- Corpo ---------------------------------------------------------------- */
+
+.corpo {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.lado {
+  display: flex;
+  flex-direction: column;
+  width: 268px;
+  min-width: 268px;
+  overflow-y: auto;
+  background: var(--painel);
+}
+
+.lado.esquerda {
+  border-right: 1px solid var(--borda);
+}
+
+.lado.direita {
+  border-left: 1px solid var(--borda);
+}
+
+.palco {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.palco canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.palco .teclas {
+  position: absolute;
+  left: 12px;
+  bottom: 10px;
+  padding: 6px 10px;
+  border-radius: var(--raio);
+  background: rgba(14, 17, 23, 0.72);
+  border: 1px solid var(--borda);
+  color: var(--apagado);
+  font-size: 11px;
+  pointer-events: none;
+}
+
+.palco .teclas b {
+  color: var(--texto);
+  font-weight: 600;
+}
+
+/* --- Paineis -------------------------------------------------------------- */
+
+.painel {
+  padding: 12px;
+  border-bottom: 1px solid var(--borda);
+}
+
+.painel h2 {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin: 0 0 10px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--apagado);
+}
+
+.painel h2 small {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 11px;
+}
+
+.painel h3 {
+  margin: 12px 0 6px;
+  font-size: 12px;
+  color: var(--apagado);
+}
+
+.painel .vazio {
+  margin: 0;
+  color: var(--apagado);
+  font-size: 12px;
+}
+
+/* --- Pecas ---------------------------------------------------------------- */
+
+.grade-de-pecas {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+
+.peca {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 7px 2px;
+}
+
+.peca .icone {
+  font-size: 17px;
+  line-height: 1.1;
+}
+
+.peca .nome {
+  font-size: 10px;
+  color: var(--apagado);
+  text-align: center;
+}
+
+.peca[aria-pressed='true'] {
+  background: #2f4d7a;
+  border-color: var(--marca);
+}
+
+.peca[aria-pressed='true'] .nome {
+  color: var(--texto);
+}
+
+.dica-do-pincel {
+  margin-top: 10px;
+  padding: 7px 9px;
+  border-radius: var(--raio);
+  background: var(--painel-alto);
+  color: var(--apagado);
+  font-size: 11px;
+}
+
+.linha-de-opcoes {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.linha-de-opcoes label {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--apagado);
+}
+
+/* --- Arvore --------------------------------------------------------------- */
+
+.arvore .lista {
+  min-height: 120px;
+  max-height: 42vh;
+  overflow-y: auto;
+}
+
+.ramo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.ramo:hover {
+  background: var(--painel-alto);
+}
+
+.ramo.selecionado {
+  background: #2f4d7a;
+}
+
+.ramo.oculto .nome {
+  opacity: 0.4;
+  text-decoration: line-through;
+}
+
+.ramo .nome {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.ramo .conta {
+  font-size: 10px;
+  color: var(--apagado);
+}
+
+.ramo .olho {
+  padding: 0 3px;
+  background: none;
+  border: none;
+  opacity: 0.5;
+  font-size: 11px;
+}
+
+.ramo .olho:hover {
+  opacity: 1;
+  background: none;
+}
+
+/* --- Inspetor ------------------------------------------------------------- */
+
+.bloco {
+  padding-top: 8px;
+  border-top: 1px solid var(--borda);
+}
+
+.bloco:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+
+.campo,
+.trio,
+.linha-de-giro {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.rotulo {
+  width: 76px;
+  min-width: 76px;
+  font-size: 11px;
+  color: var(--apagado);
+}
+
+.rotulo em {
+  font-style: normal;
+  opacity: 0.6;
+  margin-left: 3px;
+}
+
+input.numero,
+input.texto,
+select {
+  min-width: 0;
+  width: 100%;
+  padding: 5px 7px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--texto);
+  background: var(--painel-alto);
+  border: 1px solid var(--borda);
+  border-radius: 6px;
+}
+
+.trio input.numero {
+  flex: 1;
+}
+
+.linha-de-giro input.numero {
+  flex: 1;
+}
+
+.linha-de-giro button {
+  padding: 5px 9px;
+}
+
+.deslizador {
+  display: block;
+  margin-bottom: 7px;
+}
+
+.deslizador .rotulo {
+  display: block;
+  width: auto;
+  margin-bottom: 2px;
+}
+
+.deslizador .controles {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.deslizador input[type='range'] {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--marca);
+}
+
+.deslizador input.numero {
+  width: 68px;
+  min-width: 68px;
+}
+
+.cor {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cor input[type='color'] {
+  width: 42px;
+  height: 26px;
+  padding: 0;
+  background: none;
+  border: 1px solid var(--borda);
+  border-radius: 6px;
+}
+
+.nota {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: var(--apagado);
+}
+
+.acoes {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.acoes button {
+  flex: 1;
+}

@@ -266,8 +266,14 @@ Entrega em fatias. Cada fatia é um pull request, e termina com **algo que você
 | **M0** ✅ | Esqueleto: Vite, TS, Three.js, ECS, laço de jogo, contador de fps | Abrir uma janela 3D e confirmar que o PC aguenta |
 | **M1** ✅ | Personagem controlável, câmera que segue, **gamepad de Xbox** | Andar com um bonequinho usando o controle |
 | **M2** | Rapier: gravidade, rampas, momentum, **superfície grudenta** | Correr num loop e sair dele |
-| **M3** | Editor v0: viewport, árvore de cena, inspetor, salvar/carregar, hot reload | Montar uma pista com peças e testar na hora |
+| **M3** ✅ | Editor v0: viewport, árvore de cena, inspetor, salvar/carregar, hot reload | Montar uma pista com peças e testar na hora |
 | **M4** | Anéis, molas, inimigo patrulheiro, meta, HUD, save | **Um jogo completo, do início ao fim** |
+
+> **Fora de ordem, e assumido:** a M3 foi entregue antes da M2. Enquanto o Rapier não
+> chega, o chão das peças no teste ao vivo do editor é uma *consulta de altura*, e não um
+> colisor: dá para subir a rampa, ficar em pé na plataforma e cair da beirada, mas não há
+> parede, teto nem superfície grudenta — e é por isso que ainda não há loop. A M2 troca
+> essa consulta pelo Rapier e apaga o `groundY` do Personagem Veloz junto.
 
 ### Mês 2 — Autoria de verdade
 M5 blocos ⇄ código · M6 gatilho-e-resposta e perfil Design · M7 spline de pista · M8 importação de assets e kit inicial

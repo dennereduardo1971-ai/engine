@@ -97,6 +97,18 @@ export class Engine {
     return this.objects.attach(entity, object);
   }
 
+  /**
+   * Tira o objeto da cena e solta a amarra com a entidade.
+   *
+   * Destruir a entidade sozinha nao basta: o mundo tira os componentes dela,
+   * mas quem guarda o objeto do Three.js e o registro da cena, e ninguem
+   * avisa ele. Sem esta chamada, apagar uma peca no editor a apagaria do ECS
+   * e a deixaria desenhada na tela.
+   */
+  detach(entity: Entity): void {
+    this.objects.detach(entity);
+  }
+
   /** Cria um lote instanciado (muitos objetos iguais, uma chamada de desenho). */
   createBatch(
     geometry: THREE.BufferGeometry,

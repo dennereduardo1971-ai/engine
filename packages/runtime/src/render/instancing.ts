@@ -32,6 +32,15 @@ export class InstancedBatch {
     return this.used;
   }
 
+  /**
+   * Entidade que ocupa uma vaga do lote. E o caminho de volta do clique: o
+   * raycaster do Three devolve o `instanceId` da instancia acertada, e quem
+   * clicou precisa saber qual anel e aquele.
+   */
+  entityAt(index: number): Entity | undefined {
+    return index >= 0 && index < this.used ? this.entities[index] : undefined;
+  }
+
   /** Reserva uma vaga no lote para a entidade. -1 se o lote encheu. */
   claim(entity: Entity): number {
     if (this.used >= this.capacity) return -1;

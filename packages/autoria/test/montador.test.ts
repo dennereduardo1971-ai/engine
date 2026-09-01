@@ -1,0 +1,294 @@
+import { beforeEach, describe, expect, it } from 'vitest';
+import * as THREE from 'three';
+import {
+  type Entity,
+  InstancedBatch,
+  ObjectRegistry,
+  Transform,
+  World,
+  type UpdateContext,
+} from '@faisca/runtime';
+import { SpeedCharacter } from '@faisca/kit-velocidade';
+import {
+  type AssemblerHost,
+  faseDeExemplo,
+  findPiece,
+  localFromWorld,
+  SceneAssembler,
+  SceneDocument,
+  surfaceHeightAt,
+  worldPlacement,
+} from '../src/index.ts';
+
+/**
+ * O montador e a fronteira entre editar e rodar. Nao da para testar o desenho
+ * sem uma placa de video, mas da para testar o que importa: o documento e o
+ * mundo ficam iguais, mudar um valor chega no componente vivo sem remontar a
+ * fase, e o chao das pecas responde onde a peca esta.
+ */
+class HospedeiroDeTeste implements AssemblerHost {
+  readonly world = new World();
+  readonly scene = new THREE.Group();
+  readonly batches: InstancedBatch[] = [];
+  private readonly registry = new ObjectRegistry(this.scene);
+
+  attach(entity: Entity, object: THREE.Object3D): number {
+    return this.registry.attach(entity, object);
+  }
+
+  detach(entity: Entity): void {
+    this.registry.detach(entity);
+  }
+
+  createBatch(
+    geometry: THREE.BufferGeometry,
+    material: THREE.Material,
+    capacity: number,
+  ): InstancedBatch {
+    const batch = new InstancedBatch(this.batches.length, geometry, material, capacity);
+    this.batches.push(batch);
+    this.scene.add(batch.mesh);
+    return batch;
+  }
+}
+
+let host: HospedeiroDeTeste;
+let doc: SceneDocument;
+let montador: SceneAssembler;
+
+beforeEach(() => {
+  host = new HospedeiroDeTeste();
+  host.world.clear();
+  doc = new SceneDocument('Fase');
+  montador = new SceneAssembler(host, doc);
+});
+
+function posicaoDe(nodeId: string): { x: number; y: number; z: number } {
+  const entidade = montador.entityOf(nodeId)!;
+  const slot = Transform.slotOf(entidade);
+  const f = Transform.fields;
+  return { x: f.x[slot], y: f.y[slot], z: f.z[slot] };
+}
+
+describe('montar e acompanhar o documento', () => {
+  it('cria uma entidade por no', () => {
+    doc.add('reta', { transform: { z: 4 } });
+    doc.add('anel');
+    montador.build();
+
+    expect(host.world.count).toBe(2);
+    expect(posicaoDe(doc.nodes[0].id).z).toBe(4);
+  });
+
+  it('mover no editor move no mundo, sem remontar', () => {
+    const no = doc.add('reta');
+    montador.build();
+    const antes = montador.entityOf(no.id);
+
+    doc.setTransform(no.id, { x: 8, z: 12 });
+
+    expect(posicaoDe(no.id)).toMatchObject({ x: 8, z: 12 });
+    // A mesma entidade: a peca foi movida, e nao recriada.
+    expect(montador.entityOf(no.id)).toBe(antes);
+  });
+
+  it('mover o pai move o galho inteiro', () => {
+    const pista = doc.add('grupo', { name: 'Pista' });
+    const reta = doc.add('reta', { parent: pista.id, transform: { z: 8 } });
+    montador.build();
+
+    doc.setTransform(pista.id, { x: 20 });
+    expect(posicaoDe(reta.id)).toMatchObject({ x: 20, z: 8 });
+
+    // Girar o pai leva o filho pelo arco: 90 graus levam o +Z dele para o +X.
+    doc.setTransform(pista.id, { x: 0, yaw: 90 });
+    const movido = posicaoDe(reta.id);
+    expect(movido.x).toBeCloseTo(8, 5);
+    expect(movido.z).toBeCloseTo(0, 5);
+  });
+
+  it('apagar tira a entidade e o objeto da cena', () => {
+    const no = doc.add('reta');
+    montador.build();
+    const objeto = montador.objectOf(no.id)!;
+    expect(objeto.parent).toBe(host.scene);
+
+    doc.remove(no.id);
+    expect(montador.entityOf(no.id)).toBeUndefined();
+    expect(host.world.count).toBe(0);
+    expect(objeto.parent).toBe(null);
+  });
+
+  it('aneis dividem uma chamada de desenho', () => {
+    for (let i = 0; i < 40; i++) doc.add('anel', { transform: { z: i } });
+    montador.build();
+
+    expect(host.batches).toHaveLength(1);
+    expect(host.batches[0].count).toBe(40);
+  });
+});
+
+describe('hot reload dos deslizadores', () => {
+  it('mudar a velocidade maxima chega no personagem que ja esta correndo', () => {
+    const partida = doc.add('inicio', { transform: { z: 2 } });
+    montador.build();
+    const heroi = montador.startPlay();
+    const cs = SpeedCharacter.slotOf(heroi);
+
+    const fabrica = SpeedCharacter.fields.maxSpeed[cs];
+    doc.setField(partida.id, 'SpeedCharacter', 'maxSpeed', fabrica + 20);
+
+    // Sem reiniciar a fase: o mesmo personagem, com o valor novo.
+    expect(montador.hero).toBe(heroi);
+    expect(SpeedCharacter.fields.maxSpeed[cs]).toBe(fabrica + 20);
+  });
+
+  it('o personagem nasce no ponto de partida', () => {
+    doc.add('inicio', { transform: { x: 6, z: 12 } });
+    montador.build();
+    const heroi = montador.startPlay();
+    const ts = Transform.slotOf(heroi);
+
+    expect(Transform.fields.x[ts]).toBe(6);
+    expect(Transform.fields.z[ts]).toBe(12);
+  });
+
+  it('parar o teste tira o personagem da fase', () => {
+    doc.add('inicio');
+    montador.build();
+    montador.startPlay();
+    expect(montador.playing).toBe(true);
+
+    montador.stopPlay();
+    expect(montador.playing).toBe(false);
+    expect(SpeedCharacter.count).toBe(0);
+  });
+});
+
+describe('chao das pecas', () => {
+  it('a reta sustenta em cima dela e nao fora dela', () => {
+    doc.add('reta', { transform: { y: 4 } });
+    montador.build();
+
+    // A reta tem 8 por 8 e meia unidade de grossura.
+    expect(montador.groundHeight(0, 0)).toBe(4.5);
+    expect(montador.groundHeight(3.9, 3.9)).toBe(4.5);
+    expect(montador.groundHeight(9, 0)).toBe(0);
+  });
+
+  it('a rampa sobe de uma ponta a outra', () => {
+    doc.add('rampa');
+    montador.build();
+
+    expect(montador.groundHeight(0, -4)).toBeCloseTo(0, 5);
+    expect(montador.groundHeight(0, 0)).toBeCloseTo(2, 5);
+    expect(montador.groundHeight(0, 4)).toBeCloseTo(4, 5);
+  });
+
+  it('a peca girada leva o chao junto', () => {
+    // Uma plataforma de 4 por 4 girada 45 graus: o canto que antes estava
+    // fora passa a estar dentro, e vice-versa.
+    doc.add('plataforma', { transform: { yaw: 45 } });
+    montador.build();
+
+    expect(montador.groundHeight(0, 2.6)).toBe(0.5);
+    expect(montador.groundHeight(1.9, 1.9)).toBe(0);
+  });
+
+  it('a curva sustenta dentro do arco e nao no miolo', () => {
+    doc.add('curva');
+    montador.build();
+
+    // Raios de 6 a 14, saindo do +X e indo para o -Z.
+    expect(montador.groundHeight(10, 0)).toBe(0.5);
+    expect(montador.groundHeight(0, -10)).toBe(0.5);
+    expect(montador.groundHeight(2, 0)).toBe(0);
+    expect(montador.groundHeight(0, 10)).toBe(0);
+  });
+
+  it('nao cola o personagem no que esta acima da cabeca dele', () => {
+    doc.add('plataforma', { transform: { y: 10 } });
+    montador.build();
+
+    expect(montador.groundHeight(0, 0, 1)).toBe(0);
+    expect(montador.groundHeight(0, 0, 20)).toBe(10.5);
+  });
+
+  it('o sistema do chao escreve a altura debaixo do personagem', () => {
+    doc.add('inicio', { transform: { y: 2.5 } });
+    doc.add('reta', { transform: { y: 2 } });
+    montador.build();
+    const heroi = montador.startPlay();
+    const sistema = montador.groundSystem();
+
+    sistema.update({} as UpdateContext);
+    expect(SpeedCharacter.fields.groundY[SpeedCharacter.slotOf(heroi)]).toBe(2.5);
+  });
+});
+
+describe('arvore e mundo', () => {
+  it('do mundo de volta para o pai, e o mesmo ponto', () => {
+    const pai = doc.add('grupo', { transform: { x: 10, z: -4, yaw: 37 } });
+    const filho = doc.add('reta', { parent: pai.id, transform: { x: 3, z: 5 } });
+
+    const mundo = worldPlacement(doc, filho);
+    const local = localFromWorld(doc, pai.id, mundo.x, mundo.y, mundo.z);
+
+    expect(local.x).toBeCloseTo(3, 5);
+    expect(local.z).toBeCloseTo(5, 5);
+  });
+
+  it('peca sem superficie nao sustenta ninguem', () => {
+    const anel = findPiece('anel')!;
+    const altura = surfaceHeightAt(
+      { piece: anel, x: 0, y: 0, z: 0, yaw: 0, sx: 1, sy: 1, sz: 1 },
+      0,
+      0,
+    );
+    expect(altura).toBeNull();
+  });
+});
+
+describe('a fase de exemplo', () => {
+  /**
+   * A fase que abre junto com o editor e a primeira coisa que alguem ve. Se
+   * ela tiver um buraco no meio da pista, a primeira impressao da engine e um
+   * personagem despencando sem motivo. Este teste percorre a linha de corrida
+   * inteira e cobra chao debaixo dela em cada passo.
+   */
+  it('tem chão do começo ao fim da linha de corrida', () => {
+    doc.load(faseDeExemplo());
+    montador.build();
+
+    const linha: { x: number; z: number; altura: number }[] = [];
+    // Reta A e Reta B: piso raso.
+    for (let z = 0.5; z < 16; z += 1) linha.push({ x: 0, z, altura: 0.5 });
+    // Rampa: sobe 4 em 8.
+    for (let z = 16.5; z < 24; z += 1) {
+      linha.push({ x: 0, z, altura: ((z - 16) / 8) * 4 });
+    }
+    // Trecho suspenso.
+    for (let z = 24.5; z < 40; z += 1) linha.push({ x: 0, z, altura: 4 });
+    // A curva, andando pelo meio da pista: raio 10 em volta de (10, 40).
+    for (let passo = 1; passo <= 20; passo++) {
+      const t = (passo / 20) * (Math.PI / 2);
+      linha.push({ x: 10 - Math.cos(t) * 10, z: 40 + Math.sin(t) * 10, altura: 4 });
+    }
+    // Saída da curva, correndo para o +X.
+    for (let x = 10.5; x < 18; x += 1) linha.push({ x, z: 50, altura: 4 });
+
+    for (const ponto of linha) {
+      const altura = montador.groundHeight(ponto.x, ponto.z, 10);
+      expect(
+        Math.abs(altura - ponto.altura),
+        `sem chão em x=${ponto.x.toFixed(1)} z=${ponto.z.toFixed(1)}: achei ${altura}, esperava ${ponto.altura.toFixed(2)}`,
+      ).toBeLessThan(0.05);
+    }
+  });
+
+  it('tem um ponto de partida, e um só', () => {
+    doc.load(faseDeExemplo());
+    const partidas = doc.nodes.filter((no) => no.piece === 'inicio');
+    expect(partidas).toHaveLength(1);
+  });
+});

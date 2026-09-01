@@ -4,6 +4,7 @@
     "packages/*/src/**/*.ts",
     "packages/*/test/**/*.ts",
     "apps/*/src/**/*.ts",
+    "apps/*/src/**/*.tsx",
     "apps/*/*.config.ts"
   ]
 }

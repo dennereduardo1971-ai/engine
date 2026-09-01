@@ -72,3 +72,38 @@ describe('laco de passo fixo', () => {
     expect(passos.length).toBe(antes);
   });
 });
+
+describe('pausa e passo-a-passo', () => {
+  it('parado, a tela continua desenhando e a simulacao nao anda', () => {
+    const { laco, passos, alphas } = criarLaco();
+    laco.paused = true;
+    laco.advance(100);
+    laco.advance(200);
+
+    expect(passos.length).toBe(0);
+    // A cena parada tem que continuar na tela, e nao apagar.
+    expect(alphas.length).toBe(2);
+    expect(alphas.at(-1)).toBe(1);
+  });
+
+  it('despausar nao dispara de uma vez o tempo que ficou parado', () => {
+    const { laco, passos } = criarLaco();
+    laco.paused = true;
+    laco.advance(5_000);
+    laco.paused = false;
+    laco.advance(5_017); // um quadro normal depois da pausa
+    expect(passos.length).toBe(1);
+  });
+
+  it('o passo-a-passo anda exatamente um passo', () => {
+    const { laco, passos } = criarLaco();
+    laco.paused = true;
+    laco.advance(100);
+    expect(passos.length).toBe(0);
+
+    laco.stepOnce();
+    expect(passos.length).toBe(1);
+    expect(laco.elapsed).toBeCloseTo(DEFAULT_STEP, 5);
+    expect(laco.stepCount).toBe(1);
+  });
+});

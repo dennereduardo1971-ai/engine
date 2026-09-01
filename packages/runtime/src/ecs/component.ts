@@ -56,6 +56,9 @@ let nextComponentId = 0;
  * Quem tem o componente ocupa vagas de 0 a `count - 1`, sem buracos. Um
  * sistema que percorre `Vida` percorre memoria contigua do inicio ao fim.
  */
+/** Valores de fabrica de um componente, por campo. */
+export type Defaults<S extends Schema> = Partial<Record<keyof S & string, number>>;
+
 export class Component<S extends Schema = Schema> {
   readonly id: number = nextComponentId++;
   /** Nome no codigo, em ingles. */
@@ -63,6 +66,15 @@ export class Component<S extends Schema = Schema> {
   /** Nome na interface, em portugues (secao 6 do plano). */
   readonly label: string;
   readonly schema: S;
+  /**
+   * Valores que o componente recebe ao ser adicionado.
+   *
+   * Sem isto, todo campo nasce zero — e zero e um pessimo padrao para quase
+   * tudo: um inimigo com raio zero nao encosta em ninguem, e uma mola com
+   * forca zero nao joga ninguem. Quem define o componente sabe os numeros
+   * certos; o editor so precisa poder adiciona-lo e ver algo funcionando.
+   */
+  readonly defaults: Defaults<S>;
 
   /**
    * Arrays por campo, indexados pela vaga.
@@ -78,10 +90,11 @@ export class Component<S extends Schema = Schema> {
   private size = 0;
   private capacity = INITIAL_CAPACITY;
 
-  constructor(name: string, label: string, schema: S) {
+  constructor(name: string, label: string, schema: S, defaults: Defaults<S> = {}) {
     this.name = name;
     this.label = label;
     this.schema = schema;
+    this.defaults = defaults;
     this.fields = {} as Fields<S>;
     for (const key of Object.keys(schema) as (keyof S & string)[]) {
       const Ctor = CONSTRUCTORS[schema[key]];
@@ -127,8 +140,10 @@ export class Component<S extends Schema = Schema> {
     const slot = this.size++;
     this.dense[slot] = entity;
     this.sparse[index] = slot;
+    const defaults = this.defaults as Record<string, number | undefined>;
     for (const key of Object.keys(this.schema)) {
-      (this.fields as Record<string, ArrayBufferView & { [i: number]: number }>)[key][slot] = 0;
+      (this.fields as Record<string, ArrayBufferView & { [i: number]: number }>)[key][slot] =
+        defaults[key] ?? 0;
     }
     return slot;
   }
@@ -191,16 +206,17 @@ export const componentRegistry: Component[] = [];
 /**
  * Define um componente.
  *
- *   const Vida = defineComponent('Health', 'Vida', { atual: 'i16', maxima: 'i16' });
+ *   const Vida = defineComponent('Health', 'Vida', { atual: 'i16', maxima: 'i16' }, { atual: 3, maxima: 3 });
  *   const vaga = Vida.add(inimigo);
- *   Vida.fields.atual[vaga] = 3;
+ *   Vida.fields.atual[vaga]; // 3, sem ninguem precisar escrever
  */
 export function defineComponent<S extends Schema>(
   name: string,
   label: string,
   schema: S,
+  defaults: Defaults<S> = {},
 ): Component<S> {
-  const component = new Component(name, label, schema);
+  const component = new Component(name, label, schema, defaults);
   componentRegistry.push(component as Component);
   return component;
 }

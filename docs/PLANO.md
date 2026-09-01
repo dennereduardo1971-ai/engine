@@ -264,13 +264,19 @@ Entrega em fatias. Cada fatia é um pull request, e termina com **algo que você
 | Fatia | Entrega | Você consegue |
 |---|---|---|
 | **M0** ✅ | Esqueleto: Vite, TS, Three.js, ECS, laço de jogo, contador de fps | Abrir uma janela 3D e confirmar que o PC aguenta |
-| **M1** | Personagem controlável, câmera que segue, **gamepad de Xbox** | Andar com um bonequinho usando o controle |
-| **M2** | Rapier: gravidade, rampas, momentum, **superfície grudenta** | Correr num loop e sair dele |
-| **M3** | Editor v0: viewport, árvore de cena, inspetor, salvar/carregar, hot reload | Montar uma pista com peças e testar na hora |
-| **M4** | Anéis, molas, inimigo patrulheiro, meta, HUD, save | **Um jogo completo, do início ao fim** |
+| **M1** ✅ | Personagem controlável, câmera que segue, **gamepad de Xbox** | Andar com um bonequinho usando o controle |
+| **M2** ✅ | Rapier: gravidade, rampas, momentum, **superfície grudenta** | Correr num loop e sair dele |
+| **M3** ✅ | Editor v0: viewport, árvore de cena, inspetor, salvar/carregar, hot reload | Montar uma pista com peças e testar na hora |
+| **M4** ✅ | Anéis, molas, inimigo patrulheiro, meta, HUD, save | **Um jogo completo, do início ao fim** |
+
+> **Fora de ordem, e resolvido:** a M3 foi entregue antes da M2. Enquanto o Rapier não
+> chegava, o chão das peças no teste ao vivo do editor era uma *consulta de altura*, e não
+> um colisor: dava para subir a rampa e ficar em pé na plataforma, mas não havia parede,
+> teto nem superfície grudenta. A M2 apagou essa consulta: hoje cada peça vira um colisor
+> de malha no Rapier, do jeito que ela é desenhada, e o que se vê é o que se colide.
 
 ### Mês 2 — Autoria de verdade
-M5 blocos ⇄ código · M6 gatilho-e-resposta e perfil Design · M7 spline de pista · M8 importação de assets e kit inicial
+M5 ✅ blocos ⇄ código · M6 gatilho-e-resposta e perfil Design · M7 spline de pista · M8 importação de assets e kit inicial
 
 ### Mês 3 — Família
 M9 editor de interface e menus · M10 diálogos e cutscenes · M11 publicar link + galeria · M12 Modo Criança com narração

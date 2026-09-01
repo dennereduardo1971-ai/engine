@@ -46,6 +46,13 @@ export class Loop {
   stepCount = 0;
   elapsed = 0;
 
+  /**
+   * Simulacao congelada: o laco continua desenhando, mas nao avanca passos
+   * fixos. E o pause do teste ao vivo do editor (secao 8 do plano) — a cena
+   * fica parada na tela, e nao preta.
+   */
+  paused = false;
+
   constructor(options: LoopOptions) {
     this.step = options.step ?? DEFAULT_STEP;
     this.maxCatchUp = options.maxCatchUp ?? 5;
@@ -88,6 +95,14 @@ export class Loop {
     const maxFrame = this.step * this.maxCatchUp;
     if (frameTime > maxFrame) frameTime = maxFrame;
 
+    if (this.paused) {
+      // Sem acumular tempo enquanto parado: senao despausar dispararia de uma
+      // vez todos os passos do tempo em que o jogador ficou olhando a cena.
+      this.accumulator = 0;
+      this.onRender(1, frameTime);
+      return;
+    }
+
     this.accumulator += frameTime;
     let steps = 0;
     while (this.accumulator >= this.step && steps < this.maxCatchUp) {
@@ -99,6 +114,17 @@ export class Loop {
     }
 
     this.onRender(this.accumulator / this.step, frameTime);
+  }
+
+  /**
+   * Avanca exatamente um passo fixo, esteja o laco parado ou nao. E o
+   * passo-a-passo do editor: da para ver o quadro seguinte da simulacao sem
+   * soltar o jogo.
+   */
+  stepOnce(): void {
+    this.onFixed(this.stepCount, this.elapsed, this.step);
+    this.stepCount++;
+    this.elapsed += this.step;
   }
 
   private schedule(): void {

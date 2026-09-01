@@ -1,0 +1,18 @@
+{
+  "name": "@faisca/autoria",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Camada de autoria da Faisca: documento de cena, formato .cena, pecas e montador",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@faisca/blocos": "*",
+    "@faisca/kit-inimigos": "*",
+    "@faisca/kit-velocidade": "*",
+    "@faisca/runtime": "*",
+    "three": "^0.180.0"
+  }
+}

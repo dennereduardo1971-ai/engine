@@ -10,15 +10,19 @@
     "apps/*"
   ],
   "scripts": {
-    "dev": "npm run dev --workspace @faisca/playground",
-    "build": "npm run build --workspace @faisca/playground",
-    "preview": "npm run preview --workspace @faisca/playground",
+    "dev": "npm run dev --workspace @faisca/editor",
+    "playground": "npm run dev --workspace @faisca/playground",
+    "build": "npm run build --workspace @faisca/playground && npm run build --workspace @faisca/editor",
+    "preview": "npm run preview --workspace @faisca/editor",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "orcamento": "vitest run --reporter verbose packages/runtime/test/orcamento.test.ts"
   },
   "devDependencies": {
     "@types/node": "^22.20.1",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "@vitejs/plugin-react": "^5.2.0",
     "typescript": "^5.9.3",
     "vite": "^7.1.7",
     "vitest": "^3.2.4"

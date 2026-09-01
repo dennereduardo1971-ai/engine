@@ -12,6 +12,7 @@ export {
   defineComponent,
   defineTag,
   NO_SLOT,
+  type Defaults,
   type FieldType,
   type Fields,
   type Schema,
@@ -27,6 +28,21 @@ export {
   type UpdateContext,
 } from './ecs/system.ts';
 
+export {
+  Input,
+  applyDeadzone,
+  type GamepadLike,
+  type InputOptions,
+  type Vec2,
+} from './input/input.ts';
+export {
+  defaultBindings,
+  XBOX,
+  type AxisBinding,
+  type Bindings,
+  type ButtonBinding,
+} from './input/bindings.ts';
+
 export { Loop, DEFAULT_STEP, type LoopOptions } from './loop/loop.ts';
 export { Profiler, BUDGET, type FrameStats } from './loop/profiler.ts';
 
@@ -37,6 +53,36 @@ export { InstancedBatch, instancedSyncSystem } from './render/instancing.ts';
 
 export { Transform, Velocity, Visual, Instanced, placeAt } from './scene/components.ts';
 export { transformHistorySystem, velocitySystem } from './scene/systems.ts';
+
+export {
+  loadRapier,
+  rapier,
+  rapierReady,
+  type Collider,
+  type Rapier,
+  type RigidBody,
+  type Shape,
+} from './physics/rapier.ts';
+export {
+  DEFAULT_GRAVITY,
+  PhysicsWorld,
+  type Hit,
+  type PhysicsOptions,
+  type Placement,
+  type Quat,
+  type Vec3,
+} from './physics/world.ts';
+export {
+  Body,
+  BodyRegistry,
+  BODY_DYNAMIC,
+  BODY_FIXED,
+  BODY_KINEMATIC,
+  physicsStepSystem,
+  physicsSyncSystem,
+} from './physics/components.ts';
+
+export { MemoryStorage, SaveSlot, type SaveOptions } from './save/save.ts';
 
 export { Engine, type EngineOptions } from './engine.ts';
 export { PerfHud } from './debug/perf-hud.ts';

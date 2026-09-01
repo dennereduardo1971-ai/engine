@@ -27,5 +27,5 @@ jobs:
       - name: Testes e orçamento de performance
         run: npm test
 
-      - name: Build do jogo publicado
+      - name: Build do editor e da cena de referência
         run: npm run build

@@ -1,0 +1,16 @@
+{
+  "name": "@faisca/kit-inimigos",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Kit Inimigos: patrulheiro agora; perseguidor, atirador e voador depois",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@faisca/kit-velocidade": "*",
+    "@faisca/runtime": "*",
+    "three": "^0.180.0"
+  }
+}

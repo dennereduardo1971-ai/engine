@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { World } from './ecs/world.ts';
+import { Input, type InputOptions } from './input/input.ts';
 import { type Entity } from './ecs/entity.ts';
 import { Scheduler, type System, type UpdateContext } from './ecs/system.ts';
 import { Loop } from './loop/loop.ts';
@@ -9,6 +10,8 @@ import { QualitySupervisor } from './render/quality.ts';
 import { InstancedBatch, instancedSyncSystem } from './render/instancing.ts';
 import { ObjectRegistry, visualSyncSystem } from './render/scene-sync.ts';
 import { transformHistorySystem, velocitySystem } from './scene/systems.ts';
+import { PhysicsWorld, type PhysicsOptions } from './physics/world.ts';
+import { BodyRegistry, physicsStepSystem, physicsSyncSystem } from './physics/components.ts';
 
 export interface EngineOptions {
   canvas: HTMLCanvasElement;
@@ -18,6 +21,15 @@ export interface EngineOptions {
   clearColor?: number;
   /** Liga a qualidade adaptativa. Padrao: ligada. */
   adaptiveQuality?: boolean;
+  /** Opcoes da entrada (mapeamento de controles, alvo dos eventos). */
+  input?: InputOptions;
+  /**
+   * Liga a fisica. Padrao: ligada.
+   *
+   * Exige `await loadRapier()` antes de construir a engine — o wasm do Rapier
+   * precisa estar carregado, e o construtor nao pode esperar.
+   */
+  physics?: boolean | PhysicsOptions;
 }
 
 /**
@@ -37,6 +49,10 @@ export class Engine {
   readonly camera: THREE.PerspectiveCamera;
   readonly objects: ObjectRegistry;
   readonly loop: Loop;
+  readonly input: Input;
+  /** O mundo de fisica, ou null se a engine foi criada sem ela. */
+  readonly physics: PhysicsWorld | null;
+  readonly bodies: BodyRegistry | null;
 
   private readonly batches: InstancedBatch[] = [];
   private logicMs = 0;
@@ -50,6 +66,7 @@ export class Engine {
     });
     this.camera = new THREE.PerspectiveCamera(60, this.renderer.aspect, 0.1, 500);
     this.objects = new ObjectRegistry(this.scene);
+    this.input = new Input(options.input);
     this.quality = new QualitySupervisor(this.profiler);
     this.quality.enabled = options.adaptiveQuality ?? true;
 
@@ -59,11 +76,23 @@ export class Engine {
       onRender: (alpha, frameTime) => this.renderFrame(alpha, frameTime),
     });
 
+    if (options.physics === false) {
+      this.physics = null;
+      this.bodies = null;
+    } else {
+      this.physics = new PhysicsWorld(options.physics === true ? {} : options.physics);
+      this.bodies = new BodyRegistry(this.physics);
+    }
+
     // Sistemas de fundacao, sempre presentes.
     this.add(transformHistorySystem());
     this.add(velocitySystem());
     this.add(visualSyncSystem(this.objects));
     this.add(instancedSyncSystem(this.batches));
+    if (this.physics && this.bodies) {
+      this.add(physicsStepSystem(this.physics));
+      this.add(physicsSyncSystem(this.bodies));
+    }
 
     // Degrau de qualidade que ja existe no M0: escala de renderizacao.
     // Sombras, particulas e pos-processamento entram nos degraus certos
@@ -92,6 +121,18 @@ export class Engine {
     return this.objects.attach(entity, object);
   }
 
+  /**
+   * Tira o objeto da cena e solta a amarra com a entidade.
+   *
+   * Destruir a entidade sozinha nao basta: o mundo tira os componentes dela,
+   * mas quem guarda o objeto do Three.js e o registro da cena, e ninguem
+   * avisa ele. Sem esta chamada, apagar uma peca no editor a apagaria do ECS
+   * e a deixaria desenhada na tela.
+   */
+  detach(entity: Entity): void {
+    this.objects.detach(entity);
+  }
+
   /** Cria um lote instanciado (muitos objetos iguais, uma chamada de desenho). */
   createBatch(
     geometry: THREE.BufferGeometry,
@@ -114,9 +155,12 @@ export class Engine {
 
   dispose(): void {
     this.stop();
+    this.input.dispose();
     this.scheduler.stopAll(this.world);
     for (const batch of this.batches) batch.dispose();
     this.renderer.dispose();
+    this.bodies?.clear();
+    this.physics?.dispose();
   }
 
   private fixedStep(step: number, elapsed: number, dt: number): void {
@@ -126,10 +170,14 @@ export class Engine {
       elapsed,
       step,
       frame: this.profiler.frame,
+      frameTime: dt,
       alpha: 1,
     };
 
+    // A entrada e lida antes de qualquer sistema: as bordas de botao ficam
+    // alinhadas com o passo da simulacao.
     let mark = performance.now();
+    this.input.update();
     this.scheduler.run('logic', context);
     const afterLogic = performance.now();
     this.logicMs += afterLogic - mark;
@@ -152,6 +200,7 @@ export class Engine {
       elapsed: this.loop.elapsed,
       step: this.loop.stepCount,
       frame: this.profiler.frame,
+      frameTime,
       alpha,
     };
 

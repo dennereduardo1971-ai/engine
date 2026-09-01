@@ -1,0 +1,15 @@
+{
+  "name": "@faisca/kit-velocidade",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Kit Velocidade: o coracao Sonic da Faisca — personagem, camera e brinquedos de pista",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@faisca/runtime": "*",
+    "three": "^0.180.0"
+  }
+}

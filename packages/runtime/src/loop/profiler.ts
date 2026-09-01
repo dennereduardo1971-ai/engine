@@ -37,7 +37,10 @@ class Series {
   }
 
   get average(): number {
-    return this.filled === 0 ? 0 : this.sum / this.filled;
+    if (this.filled === 0) return 0;
+    // A soma corrente acumula erro de arredondamento e pode ficar um fio
+    // abaixo de zero quando a fase nao custa nada. Tempo negativo nao existe.
+    return Math.max(0, this.sum / this.filled);
   }
 
   get max(): number {

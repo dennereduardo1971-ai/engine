@@ -14,12 +14,17 @@ import {
   trackToysSystem,
 } from '@faisca/kit-velocidade';
 import { patrollerSystem } from '@faisca/kit-inimigos';
+import { portaSystem } from '@faisca/kit-brinquedos';
 import { type Script } from '@faisca/blocos';
 import {
+  acharPerfil,
   faseDeExemplo,
   findPiece,
   History,
   localFromWorld,
+  type Perfil,
+  type PerfilSpec,
+  perfilValido,
   readScene,
   SceneAssembler,
   SceneDocument,
@@ -46,6 +51,7 @@ import { Viewport } from './viewport.ts';
 export type EditorMode = 'editar' | 'jogar';
 
 const CHAVE_LOCAL = 'faisca:fase-01.cena';
+const CHAVE_PERFIL = 'faisca:perfil';
 
 export class Editor {
   readonly engine: Engine;
@@ -73,6 +79,13 @@ export class Editor {
   message: string | null = null;
   /** O painel de programação está aberto? */
   scriptAberto = false;
+  /**
+   * Qual das quatro interfaces da seção 8 está em uso.
+   *
+   * Ele muda o que aparece, e nunca o que a fase é: trocar de perfil no meio
+   * do trabalho não pode mexer no projeto de ninguém.
+   */
+  perfil: Perfil = perfilValido(lerPerfilSalvo());
 
   private readonly listeners = new Set<() => void>();
   /**
@@ -124,6 +137,7 @@ export class Editor {
       trackToysSystem({ partida: this.partida, spawn: this.spawn }),
     );
     this.engine.add(patrollerSystem({ partida: this.partida }));
+    this.engine.add(portaSystem());
     this.engine.add(this.assembler.scriptSystem());
     this.assembler.partida = this.partida;
     this.hudJogo = new GameHud(this.partida, palco, {
@@ -157,6 +171,9 @@ export class Editor {
     );
 
     this.hud = new PerfHud(this.engine, palco);
+    // O painel de orçamento é do perfil Programador (seção 8): ele mede o que
+    // a seção 3 cobra, e é a única coisa da tela escrita para quem programa.
+    this.hud.element.hidden = !this.mostra.performance;
     this.engine.add(this.hud.system());
 
     this.document.on(() => {
@@ -182,6 +199,29 @@ export class Editor {
 
   get paused(): boolean {
     return this.engine.loop.paused;
+  }
+
+  /** O que este perfil mostra. */
+  get mostra(): PerfilSpec['mostra'] {
+    return acharPerfil(this.perfil).mostra;
+  }
+
+  setPerfil(perfil: Perfil): void {
+    if (this.perfil === perfil) return;
+    this.perfil = perfilValido(perfil);
+    try {
+      localStorage.setItem(CHAVE_PERFIL, this.perfil);
+    } catch {
+      // Navegador sem armazenamento: o perfil vale só nesta sessão.
+    }
+    // Sair do teste com o painel de performance ligado e voltar num perfil que
+    // não o mostra tem que apagá-lo da tela, e não deixá-lo pendurado.
+    this.hud.element.hidden = !this.mostra.performance;
+    // Um perfil sem programação nenhuma não pode manter o painel aberto.
+    if (!this.mostra.regras && !this.mostra.blocos && !this.mostra.codigo) {
+      this.scriptAberto = false;
+    }
+    this.aviso(`Perfil ${acharPerfil(this.perfil).label}.`);
   }
 
   // --- Selecao e pincel -----------------------------------------------------
@@ -468,12 +508,14 @@ export class Editor {
   }
 
   togglePause(): void {
+    if (!this.mostra.depuracao) return;
     this.engine.loop.paused = !this.engine.loop.paused;
     this.notify();
   }
 
   /** Um passo fixo de cada vez, com a simulacao parada. */
   stepOnce(): void {
+    if (!this.mostra.depuracao) return;
     this.engine.loop.paused = true;
     this.engine.loop.stepOnce();
     this.notify();
@@ -651,6 +693,15 @@ export class Editor {
 
   private notify(): void {
     for (const listener of this.listeners) listener();
+  }
+}
+
+/** O perfil salvo na máquina, se houver. Nunca lança. */
+function lerPerfilSalvo(): string | null {
+  try {
+    return localStorage.getItem(CHAVE_PERFIL);
+  } catch {
+    return null;
   }
 }
 

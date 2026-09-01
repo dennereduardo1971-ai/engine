@@ -48,10 +48,13 @@ export {
 } from './transformacoes.ts';
 
 export {
+  dentroDaZona,
   heroObject,
   SceneAssembler,
+  zonaDe,
   type AssemblerHost,
   type SpawnPoint,
+  type Zona,
 } from './montador.ts';
 
 export {
@@ -62,6 +65,16 @@ export {
   type ComponentSpec,
   type FieldSpec,
 } from './inspetor.ts';
+
+export {
+  acharPerfil,
+  PERFIL_PADRAO,
+  PERFIS,
+  perfilValido,
+  type MostraPerfil,
+  type Perfil,
+  type PerfilSpec,
+} from './perfis.ts';
 
 export { History, type HistoryOptions } from './historico.ts';
 

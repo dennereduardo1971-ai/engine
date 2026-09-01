@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@faisca/blocos": "*",
+    "@faisca/kit-brinquedos": "*",
     "@faisca/kit-inimigos": "*",
     "@faisca/kit-velocidade": "*",
     "@faisca/runtime": "*",

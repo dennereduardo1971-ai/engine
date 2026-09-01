@@ -8,6 +8,7 @@ import {
   type PhysicsWorld,
   placeAt,
   type System,
+  tocarSom,
   Transform,
   type World,
 } from '@faisca/runtime';
@@ -20,6 +21,7 @@ import {
   SpeedCharacter,
 } from '@faisca/kit-velocidade';
 import { resetPatrollers } from '@faisca/kit-inimigos';
+import { mandarPorta, resetPortas } from '@faisca/kit-brinquedos';
 import {
   conferir,
   Instancia,
@@ -28,7 +30,13 @@ import {
   type Valor,
 } from '@faisca/blocos';
 import { type SceneChange, type SceneDocument, type SceneNode } from './documento.ts';
-import { type Piece, pieceGeometry, pieceOrPlaceholder, scaledTrimesh } from './pecas.ts';
+import {
+  type Piece,
+  pieceBounds,
+  pieceGeometry,
+  pieceOrPlaceholder,
+  scaledTrimesh,
+} from './pecas.ts';
 import { worldPlacement, yawQuaternion } from './transformacoes.ts';
 
 /**
@@ -57,13 +65,31 @@ export interface AssemblerHost {
   ): InstancedBatch;
 }
 
+/**
+ * A caixa que responde por "aqui".
+ *
+ * Meias-medidas em torno da origem da peca, ja com a folga do corpo do
+ * personagem somada. Os numeros sao locais: o teste de cada quadro leva a
+ * posicao do jogador para dentro do giro da peca, e nao o contrario — assim
+ * uma Area girada 30 graus continua sendo a regiao que ela parece ser.
+ */
+export interface Zona {
+  minX: number;
+  minY: number;
+  minZ: number;
+  maxX: number;
+  maxY: number;
+  maxZ: number;
+}
+
 /** Um script vivo, ligado a peca dele. */
 export interface ScriptVivo {
   node: string;
   entity: Entity;
   instancia: Instancia;
-  /** O jogador esta perto agora? Serve para disparar o toque uma vez so. */
-  encostado: boolean;
+  /** O jogador esta dentro agora? Serve para disparar entrada e saida uma vez so. */
+  dentro: boolean;
+  zona: Zona;
 }
 
 /** Um script que deu errado, com o nome da peca para o editor mostrar. */
@@ -94,8 +120,25 @@ export interface SpawnPoint {
 
 const CAPACIDADE_PADRAO = 4_000;
 
-/** A que distancia o bloco "quando o jogador encostar em mim" dispara. */
-const TOQUE = 2.2;
+/**
+ * Folga somada a caixa da peca: meio corpo do personagem.
+ *
+ * Sem ela, "chegar aqui" so dispararia quando o *centro* do personagem
+ * entrasse na peca — ou seja, depois de ele ja ter atravessado a parede dela.
+ */
+const FOLGA = 0.7;
+
+/**
+ * Meia-medida minima de uma zona de gatilho.
+ *
+ * Uma peca fina (uma placa, um anel) tem caixa quase sem espessura, e uma zona
+ * do tamanho exato dela seria impossivel de acertar correndo a 30 unidades por
+ * segundo — o passo fixo pularia por cima dela entre um quadro e o outro.
+ */
+const ZONA_MINIMA = 0.9;
+
+/** Quantos erros de script cabem numa partida antes de o montador parar de anotar. */
+const MAX_ERROS = 20;
 
 export class SceneAssembler {
   private readonly built = new Map<string, Built>();
@@ -207,8 +250,18 @@ export class SceneAssembler {
 
     this.hero = hero;
     this.cameraEntity = camera;
+    // A Area e o contorno dela sao andaime de quem monta a fase, e nao parte
+    // dela. Quem esta jogando nao pode ver uma caixa azul flutuando na pista.
+    this.mostrarMarcacoes(false);
     this.acenderScripts();
     return hero;
+  }
+
+  /** Liga ou desliga as pecas que so existem no editor. */
+  private mostrarMarcacoes(visiveis: boolean): void {
+    for (const built of this.built.values()) {
+      if (built.piece.soNoEditor && built.object) built.object.visible = visiveis;
+    }
   }
 
   /**
@@ -240,7 +293,17 @@ export class SceneAssembler {
       }
 
       const instancia = new Instancia(script, this.ambienteDe(node, built.entity));
-      const vivo: ScriptVivo = { node: node.id, entity: built.entity, instancia, encostado: false };
+      const vivo: ScriptVivo = {
+        node: node.id,
+        entity: built.entity,
+        instancia,
+        dentro: false,
+        // A zona e medida uma vez, no comeco da partida, e a partir dai ela
+        // acompanha a peca pelo Transform. Uma peca que se move leva a zona
+        // junto; uma peca redimensionada no meio do teste, nao — e o preco de
+        // nao remedir a caixa sessenta vezes por segundo.
+        zona: zonaDe(built.piece, this.document, node),
+      };
       this.scripts.push(vivo);
       this.anotarErro(vivo, instancia.iniciar());
       this.anotarErro(vivo, instancia.disparar('AoComecar'));
@@ -278,8 +341,12 @@ export class SceneAssembler {
           const valor = argumentos[i];
           return typeof valor === 'number' ? valor : Number(valor) || 0;
         };
+        const texto = (i: number): string => String(argumentos[i] ?? '');
         const ts = vaga();
-        if (ts < 0 && nome !== 'dizer') return 0;
+        // Quase todo bloco age em quem tem o script, e sem vaga no Transform
+        // nao ha em quem agir. Os blocos que falam de fora — som, recado e os
+        // que apontam para outra peca — nao dependem dela.
+        if (ts < 0 && !SEM_VAGA.has(nome)) return 0;
 
         switch (nome) {
           case 'mover':
@@ -315,27 +382,36 @@ export class SceneAssembler {
           case 'terminarFase':
             this.partida?.vencer();
             return;
-          case 'esconder': {
-            t.sx[ts] = t.sy[ts] = t.sz[ts] = 0;
-            // Sumir da vista tem que sumir do caminho tambem. Uma peca
-            // invisivel que ainda barra o jogador e um bug que ninguem
-            // consegue ver — literalmente.
-            const built = this.built.get(node.id);
-            if (built?.collider) {
-              this.host.physics?.removeCollider(built.collider);
-              built.collider = null;
-            }
+          case 'esconder':
+            this.sumir(node);
             return;
-          }
-          case 'mostrar': {
-            const place = worldPlacement(this.document, node);
-            t.sx[ts] = place.sx;
-            t.sy[ts] = place.sy;
-            t.sz[ts] = place.sz;
-            const built = this.built.get(node.id);
-            if (built && !built.collider) this.rebuildCollider(node, built);
+          case 'mostrar':
+            this.trazer(node);
             return;
-          }
+
+          // --- Blocos que apontam para outra peca --------------------------
+          //
+          // Eles acham a peca pelo *nome* que aparece na arvore de cena, e nao
+          // por um identificador. E de proposito: o nome e a unica coisa que
+          // quem monta a fase ve e escolhe. Renomear a peca quebra a regra —
+          // e por isso o painel de regras oferece uma lista, e nao um campo de
+          // texto: escolhendo da lista, nao ha como errar o nome.
+          case 'esconderPeca':
+            this.sumir(this.exigirNo(texto(0)));
+            return;
+          case 'mostrarPeca':
+            this.trazer(this.exigirNo(texto(0)));
+            return;
+          case 'abrir':
+            this.mexerNaPorta(this.exigirNo(texto(0)), true);
+            return;
+          case 'fechar':
+            this.mexerNaPorta(this.exigirNo(texto(0)), false);
+            return;
+
+          case 'tocarSom':
+            tocarSom(texto(0));
+            return;
           case 'dizer':
             this.aoDizer?.(String(argumentos[0] ?? ''));
             return;
@@ -370,8 +446,116 @@ export class SceneAssembler {
     };
   }
 
+  /**
+   * Guarda o que um script reclamou.
+   *
+   * Sem repetir e com teto, e isso importa mais do que parece: um erro dentro
+   * de "a cada quadro" acontece sessenta vezes por segundo, e uma lista que
+   * cresce sem limite viraria centenas de milhares de linhas iguais em um
+   * minuto de teste — comendo memoria por um recado que ja foi dado na
+   * primeira vez.
+   */
+  /**
+   * Acha uma peca pelo nome que aparece na arvore de cena.
+   *
+   * A comparacao ignora maiusculas e acentos: quem digitou "porta" no lugar de
+   * "Porta" quis dizer a mesma coisa, e recusar isso seria transformar um
+   * detalhe de teclado num bug de jogo.
+   */
+  acharNoPorNome(nome: string): SceneNode | null {
+    const alvo = simplificar(nome);
+    if (!alvo) return null;
+    let aproximado: SceneNode | null = null;
+    for (const node of this.document.nodes) {
+      if (node.name === nome) return node;
+      if (!aproximado && simplificar(node.name) === alvo) aproximado = node;
+    }
+    return aproximado;
+  }
+
+  /**
+   * A peca com aquele nome, ou um erro que diz o que fazer.
+   *
+   * Erro, e nao silencio: uma regra que aponta para uma peca apagada tem que
+   * reclamar. Silenciosamente nao fazer nada e o pior desfecho possivel —
+   * quem montou a regra fica procurando o problema no lugar errado.
+   */
+  private exigirNo(nome: string): SceneNode {
+    const node = this.acharNoPorNome(nome);
+    if (!node) {
+      throw new Error(
+        nome
+          ? `Não achei nenhuma peça chamada "${nome}" nesta fase.`
+          : 'Este bloco não diz em qual peça ele deve mexer.',
+      );
+    }
+    return node;
+  }
+
+  /** Tira a peca da vista e do caminho. */
+  private sumir(node: SceneNode): void {
+    const built = this.built.get(node.id);
+    if (!built) return;
+    const ts = Transform.slotOf(built.entity);
+    if (ts >= 0) {
+      const t = Transform.fields;
+      t.sx[ts] = t.sy[ts] = t.sz[ts] = 0;
+    }
+    // Sumir da vista tem que sumir do caminho tambem. Uma peca invisivel que
+    // ainda barra o jogador e um bug que ninguem consegue ver — literalmente.
+    if (built.collider) {
+      this.host.physics?.removeCollider(built.collider);
+      built.collider = null;
+    }
+  }
+
+  /** Devolve a peca ao tamanho e ao colisor que ela tem no documento. */
+  private trazer(node: SceneNode): void {
+    const built = this.built.get(node.id);
+    if (!built) return;
+    const ts = Transform.slotOf(built.entity);
+    if (ts >= 0) {
+      const place = worldPlacement(this.document, node);
+      const t = Transform.fields;
+      t.sx[ts] = place.sx;
+      t.sy[ts] = place.sy;
+      t.sz[ts] = place.sz;
+    }
+    if (!built.collider) this.rebuildCollider(node, built);
+  }
+
+  /**
+   * Manda uma porta abrir ou fechar.
+   *
+   * O colisor vai e volta no instante do comando, e nao no fim do movimento.
+   * E uma escolha, e ela tem um custo visivel: durante os dois tercos de
+   * segundo em que a porta desliza, da para atravessar o que ainda esta na
+   * frente. O contrario custaria mais: uma porta que ja abriu na tela e ainda
+   * barra a passagem faz quem esta jogando achar que a regra nao funcionou.
+   */
+  private mexerNaPorta(node: SceneNode, abrir: boolean): void {
+    const built = this.built.get(node.id);
+    if (!built) return;
+    if (!mandarPorta(built.entity, abrir)) {
+      throw new Error(`"${node.name}" não é uma Porta, então não dá para abrir nem fechar.`);
+    }
+    if (abrir) {
+      if (built.collider) {
+        this.host.physics?.removeCollider(built.collider);
+        built.collider = null;
+      }
+    } else if (!built.collider) {
+      this.rebuildCollider(node, built);
+    }
+  }
+
   private anotarErro(vivo: ScriptVivo, erro: ErroDeExecucao | null): void {
     if (!erro) return;
+    if (this.errosDeScript.length >= MAX_ERROS) return;
+    const repetido = this.errosDeScript.some(
+      (anotado) => anotado.node === vivo.node && anotado.mensagem === erro.mensagem,
+    );
+    if (repetido) return;
     const node = this.document.get(vivo.node);
     this.errosDeScript.push({
       node: vivo.node,
@@ -399,6 +583,8 @@ export class SceneAssembler {
     this.scripts.length = 0;
     resetTrackToys();
     resetPatrollers();
+    resetPortas();
+    this.mostrarMarcacoes(true);
     for (const node of this.document.nodes) this.place(node);
   }
 
@@ -409,10 +595,15 @@ export class SceneAssembler {
   /**
    * O sistema que faz os scripts andarem.
    *
-   * Ele dispara "a cada quadro" em todo script vivo e "quando o jogador
-   * encostar" na borda de entrada — uma vez por chegada, e nao a cada quadro
-   * em que o jogador ainda esta perto. Sem essa borda, encostar num inimigo
+   * Ele dispara "a cada quadro" em todo script vivo, e o par de bordas da
+   * zona: **chegar aqui** quando o jogador entra, **sair daqui** quando ele
+   * sai. Bordas, e nao estados — uma vez por chegada e uma por saida, e nao a
+   * cada quadro em que ele ainda esta dentro. Sem isso, encostar num inimigo
    * com um "tirar uma vida" dentro tiraria sessenta vidas por segundo.
+   *
+   * O teste e uma caixa, e nao um raio: desde a M6 a peca Area e o "aqui" da
+   * regra-modelo da secao 7, e uma area comprida com um raio no meio nao seria
+   * a regiao que ela desenha na tela.
    */
   scriptSystem(): System {
     return defineSystem({
@@ -430,12 +621,24 @@ export class SceneAssembler {
           if (hs < 0) continue;
           const ts = Transform.slotOf(vivo.entity);
           if (ts < 0) continue;
-          const perto =
-            Math.hypot(t.x[hs] - t.x[ts], t.y[hs] - t.y[ts], t.z[hs] - t.z[ts]) < TOQUE;
-          if (perto && !vivo.encostado) {
+
+          const dentro = dentroDaZona(
+            vivo.zona,
+            t.x[ts],
+            t.y[ts],
+            t.z[ts],
+            t.qy[ts],
+            t.qw[ts],
+            t.x[hs],
+            t.y[hs],
+            t.z[hs],
+          );
+          if (dentro && !vivo.dentro) {
             this.anotarErro(vivo, vivo.instancia.disparar('AoEncostar', 'jogador'));
+          } else if (!dentro && vivo.dentro) {
+            this.anotarErro(vivo, vivo.instancia.disparar('AoSair', 'jogador'));
           }
-          vivo.encostado = perto;
+          vivo.dentro = dentro;
         }
       },
     });
@@ -653,6 +856,12 @@ export class SceneAssembler {
       emissive: piece.id === 'anel' ? 0x3a2a00 : 0x000000,
       // A curva e uma casca fina: sem os dois lados, ela some vista de baixo.
       side: piece.mesh.kind === 'curva' ? THREE.DoubleSide : THREE.FrontSide,
+      // Peca de marcacao e vidro: da para ver onde ela esta e ver o que esta
+      // atras dela. Sem escrever no buffer de profundidade, ela tambem nao
+      // esconde a pista que passa por dentro.
+      ...(piece.soNoEditor
+        ? { transparent: true, opacity: 0.22, depthWrite: false }
+        : {}),
     });
     this.materials.set(chave, material);
     return material;
@@ -662,6 +871,91 @@ export class SceneAssembler {
     for (const nodeId of [...this.built.keys()]) this.destroy(nodeId);
     for (const batch of this.batches.values()) batch.clear();
   }
+}
+
+/** Blocos que funcionam mesmo sem a peca ter vaga no Transform. */
+const SEM_VAGA = new Set([
+  'dizer',
+  'tocarSom',
+  'abrir',
+  'fechar',
+  'esconderPeca',
+  'mostrarPeca',
+]);
+
+/**
+ * A caixa de gatilho de uma peca, em coordenadas locais e com a folga somada.
+ *
+ * Sai da caixa que envolve a malha — ou seja, da forma que a peca realmente
+ * tem — multiplicada pela escala do no. Uma Area esticada para cobrir a
+ * entrada de um tunel dispara na entrada inteira, e nao num ponto no meio.
+ */
+export function zonaDe(piece: Piece, document: SceneDocument, node: SceneNode): Zona {
+  const caixa = pieceBounds(piece);
+  const place = worldPlacement(document, node);
+  const eixo = (
+    min: number,
+    max: number,
+    escala: number,
+  ): { min: number; max: number } => {
+    let baixo = min * escala - FOLGA;
+    let alto = max * escala + FOLGA;
+    // Peca fina ganha uma zona minima em torno do meio dela, para dar para
+    // acertar correndo.
+    const meio = (baixo + alto) / 2;
+    if (alto - baixo < ZONA_MINIMA * 2) {
+      baixo = meio - ZONA_MINIMA;
+      alto = meio + ZONA_MINIMA;
+    }
+    return { min: baixo, max: alto };
+  };
+
+  const x = eixo(caixa.min.x, caixa.max.x, place.sx);
+  const y = eixo(caixa.min.y, caixa.max.y, place.sy);
+  const z = eixo(caixa.min.z, caixa.max.z, place.sz);
+  return { minX: x.min, minY: y.min, minZ: z.min, maxX: x.max, maxY: y.max, maxZ: z.max };
+}
+
+/**
+ * O jogador esta dentro da zona da peca?
+ *
+ * O giro da peca entra pelo quaternion de guinada (`qy`, `qw`) e nao por uma
+ * matriz: as pecas do editor so giram em torno do Y, e desfazer uma guinada e
+ * um seno e um cosseno. Uma matriz inversa por peca por quadro seria pagar
+ * caro por uma generalidade que o formato de cena nem guarda.
+ */
+export function dentroDaZona(
+  zona: Zona,
+  px: number,
+  py: number,
+  pz: number,
+  qy: number,
+  qw: number,
+  x: number,
+  y: number,
+  z: number,
+): boolean {
+  const dy = y - py;
+  if (dy < zona.minY || dy > zona.maxY) return false;
+
+  const dx = x - px;
+  const dz = z - pz;
+  const yaw = Math.atan2(qy, qw) * 2;
+  const cos = Math.cos(yaw);
+  const sen = Math.sin(yaw);
+  // Giro ao contrario: leva o jogador para o sistema de coordenadas da peca.
+  const lx = dx * cos - dz * sen;
+  const lz = dx * sen + dz * cos;
+  return lx >= zona.minX && lx <= zona.maxX && lz >= zona.minZ && lz <= zona.maxZ;
+}
+
+/** Sem maiusculas e sem acento, para comparar nome digitado com nome de peca. */
+function simplificar(nome: string): string {
+  return nome
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
 }
 
 /** Escreve valores num componente pelo nome, se a entidade tiver o componente. */

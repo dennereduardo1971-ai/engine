@@ -16,6 +16,12 @@ import { Deslizador, Numero, pararTeclas, Texto } from './campos.tsx';
  * monta a interface a partir da resposta. Componente novo aparece aqui no
  * mesmo dia em que e criado.
  */
+/** "3 blocos" para quem programa, "3 regras" para quem monta. */
+function quantas(quantos: number, comoBlocos: boolean): string {
+  const nome = comoBlocos ? 'bloco' : 'regra';
+  return `${quantos} ${nome}${quantos > 1 ? 's' : ''}`;
+}
+
 export function Inspetor({ editor }: { editor: Editor }) {
   const node = editor.selectedNode;
 
@@ -45,10 +51,15 @@ export function Inspetor({ editor }: { editor: Editor }) {
       </h2>
 
       <div className="bloco">
+        {/* No perfil Design a palavra "programar" nao aparece em lugar
+            nenhum: quem monta regras nao esta programando, esta dizendo o que
+            acontece quando. E a mesma arvore, e o mesmo botao. */}
         <button className="programar-abrir" onClick={() => editor.abrirScript()}>
           {node.script && node.script.corpo.length > 0
-            ? `Programar — ${node.script.corpo.length} bloco${node.script.corpo.length > 1 ? 's' : ''}`
-            : 'Programar esta peça'}
+            ? `${editor.mostra.blocos ? 'Programar' : 'Regras'} — ${quantas(node.script.corpo.length, editor.mostra.blocos)}`
+            : editor.mostra.blocos
+              ? 'Programar esta peça'
+              : 'Criar uma regra para esta peça'}
         </button>
         <label className="campo">
           <span className="rotulo">Nome</span>

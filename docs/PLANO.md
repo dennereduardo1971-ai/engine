@@ -276,7 +276,16 @@ Entrega em fatias. Cada fatia é um pull request, e termina com **algo que você
 > de malha no Rapier, do jeito que ela é desenhada, e o que se vê é o que se colide.
 
 ### Mês 2 — Autoria de verdade
-M5 ✅ blocos ⇄ código · M6 gatilho-e-resposta e perfil Design · M7 spline de pista · M8 importação de assets e kit inicial
+M5 ✅ blocos ⇄ código · M6 ✅ gatilho-e-resposta e perfil Design · M7 spline de pista · M8 importação de assets e kit inicial
+
+> **Sobre a M6.** As regras não são um formato: são a **terceira visão da mesma
+> árvore** da seção 7. Uma regra é um bloco `quando` com uma pilha de ações
+> simples dentro, e o que a tela de regras não sabe desenhar (um `se`, uma
+> conta) ela conta e avisa, em vez de esconder ou apagar. Junto vieram a peça
+> **Área** (o "aqui" de *quando o jogador entra aqui*), a **Porta** — primeiro
+> brinquedo do kit Física-brinquedo da seção 10 — e um banco de sons
+> **sintetizados**, que segura o "toca som" até a importação de áudio da M8.
+> O perfil **Criança** aparece na lista de perfis, desligado: ele é a M12.
 
 ### Mês 3 — Família
 M9 editor de interface e menus · M10 diálogos e cutscenes · M11 publicar link + galeria · M12 Modo Criança com narração

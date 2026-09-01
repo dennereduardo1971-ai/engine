@@ -1,0 +1,14 @@
+{
+  "name": "@faisca/kit-brinquedos",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Kit Fisica-brinquedo: a porta agora; alavancas, plataformas moveis e esteiras depois",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@faisca/runtime": "*"
+  }
+}

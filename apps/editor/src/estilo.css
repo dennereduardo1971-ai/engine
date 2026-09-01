@@ -62,6 +62,31 @@ body,
   gap: 4px;
 }
 
+/* O perfil de interface da secao 8: a mesma engine, outra tela. */
+.barra .perfil {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px 3px 7px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--borda);
+  border-radius: 8px;
+}
+
+.barra .perfil select {
+  padding: 2px 4px;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.barra .perfil select option {
+  color: #e6e9f0;
+  background: #1b2030;
+}
+
 .barra .recado {
   flex: 1;
   text-align: right;
@@ -603,3 +628,93 @@ select {
   cursor: pointer;
 }
 .programar .acoes .dica { font-size: 12px; opacity: 0.6; line-height: 1.5; }
+
+/* --- Regras: gatilho e resposta (M6) -------------------------------------- */
+/*
+ * A tela do perfil Design. Ela e desenhada como uma frase, e nao como uma
+ * pilha: o "quando" em cima, a seta, e as respostas recuadas a direita. Quem
+ * nunca programou le isso de cima para baixo sem ninguem explicar nada.
+ */
+.programar .regras { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
+
+.programar .regra {
+  width: 100%;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+}
+
+.programar .quando { display: flex; align-items: center; gap: 8px; }
+
+.programar .quando select {
+  flex: 1;
+  padding: 7px 9px;
+  font: inherit;
+  font-weight: 600;
+  color: #f2d68a;
+  background: #4a3a1f;
+  border: 1px solid #8a6d2f;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.programar .quando .apagar {
+  padding: 4px 8px;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  opacity: 0.4;
+  cursor: pointer;
+}
+.programar .quando:hover .apagar { opacity: 1; }
+
+.programar .entao { display: flex; gap: 8px; margin-top: 8px; }
+.programar .entao .seta { padding-top: 7px; font-size: 15px; opacity: 0.5; }
+.programar .respostas {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.programar .resposta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 9px;
+  background: #24405e;
+  border: 1px solid #37629b;
+  border-radius: 8px;
+}
+
+.programar .resposta .botoes { opacity: 0.35; }
+.programar .resposta:hover .botoes { opacity: 1; }
+
+.programar .valor.peca,
+.programar .valor.som {
+  padding: 3px 6px;
+  font: inherit;
+  color: #0e1117;
+  background: #dbe3f2;
+  border: 0;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.programar .valor.peca.faltando { background: #f87171; }
+
+/*
+ * O aviso de que a peca faz mais do que esta tela mostra.
+ *
+ * Ele existe para a promessa da secao 7 continuar de pe do lado de ca: as
+ * regras nao sao um formato mais pobre, sao uma *vista* mais simples — e uma
+ * vista que esconde sem avisar seria uma vista que mente.
+ */
+.programar .escondido {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #f0c674;
+  opacity: 0.85;
+}

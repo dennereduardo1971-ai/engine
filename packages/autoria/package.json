@@ -9,6 +9,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "@faisca/blocos": "*",
     "@faisca/kit-inimigos": "*",
     "@faisca/kit-velocidade": "*",
     "@faisca/runtime": "*",

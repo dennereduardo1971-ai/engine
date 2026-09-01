@@ -1,3 +1,4 @@
+import { ler } from '@faisca/blocos';
 import { FORMAT_VERSION, identityTransform, type SceneData, type SceneNode } from './documento.ts';
 
 /**
@@ -8,6 +9,12 @@ import { FORMAT_VERSION, identityTransform, type SceneData, type SceneNode } fro
  * suspenso, curva, aneis e cenario — feita das mesmas pecas do painel, para
  * que quem abrir consiga desmontar e remontar e entender como se faz.
  */
+/** Le um script escrito a mao, para a fase de exemplo. */
+function comScript(codigo: string): SceneNode['script'] {
+  const leitura = ler(codigo.trim() + '\n');
+  return leitura.ok ? leitura.script : null;
+}
+
 export function faseDeExemplo(): SceneData {
   const nodes: SceneNode[] = [];
   let contador = 0;
@@ -18,6 +25,7 @@ export function faseDeExemplo(): SceneData {
     transform: Partial<SceneNode['transform']>,
     parent: string | null = null,
     fields: SceneNode['fields'] = {},
+    script: SceneNode['script'] = null,
   ): SceneNode {
     const node: SceneNode = {
       id: `n${++contador}`,
@@ -28,6 +36,10 @@ export function faseDeExemplo(): SceneData {
       fields,
       color: null,
       visible: true,
+      // Só quem tem script carrega a chave, igual ao que o leitor do arquivo
+      // faz: assim a fase salva e a fase de exemplo são comparáveis campo a
+      // campo, e o teste de ida e volta continua valendo.
+      ...(script ? { script } : {}),
     };
     nodes.push(node);
     return node;
@@ -109,6 +121,20 @@ export function faseDeExemplo(): SceneData {
     no('arvore', `Árvore esquerda ${i + 1}`, { x: -9 - (i % 3), z }, cenario.id);
     no('arvore', `Árvore direita ${i + 1}`, { x: 9 + ((i + 1) % 3), z }, cenario.id);
   }
+  // Um bloco programado, para a fase de exemplo mostrar tambem a secao 7: o
+  // mesmo script visto como blocos e como codigo. Ele e escrito aqui na
+  // linguagem que a familia escreve, e nao montado no de dentro da arvore.
+  no('bloco', 'Bloco Secreto', { x: -3.5, y: 0.5, z: 9 }, jogo.id, {}, comScript(`
+on(ACadaQuadro, () => {
+  girar(2);
+});
+on(AoEncostar, (jogador) => {
+  dizer("Você achou o bloco secreto!");
+  darAneis(5);
+  esconder();
+});
+`));
+
   no('bloco', 'Bloco', { x: 0, z: -6 }, cenario.id);
 
   return { format: FORMAT_VERSION, name: 'Fase 1', nodes };

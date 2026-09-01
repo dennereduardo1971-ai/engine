@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@faisca/autoria": "*",
+    "@faisca/blocos": "*",
     "@faisca/kit-velocidade": "*",
     "@faisca/runtime": "*",
     "react": "^19.2.0",

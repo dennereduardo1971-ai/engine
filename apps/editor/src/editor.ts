@@ -14,6 +14,7 @@ import {
   trackToysSystem,
 } from '@faisca/kit-velocidade';
 import { patrollerSystem } from '@faisca/kit-inimigos';
+import { type Script } from '@faisca/blocos';
 import {
   faseDeExemplo,
   findPiece,
@@ -70,6 +71,8 @@ export class Editor {
   mode: EditorMode = 'editar';
   /** Uma linha de recado na barra: salvo, carregado, deu erro. */
   message: string | null = null;
+  /** O painel de programação está aberto? */
+  scriptAberto = false;
 
   private readonly listeners = new Set<() => void>();
   /**
@@ -121,9 +124,13 @@ export class Editor {
       trackToysSystem({ partida: this.partida, spawn: this.spawn }),
     );
     this.engine.add(patrollerSystem({ partida: this.partida }));
+    this.engine.add(this.assembler.scriptSystem());
+    this.assembler.partida = this.partida;
     this.hudJogo = new GameHud(this.partida, palco, {
       dica: 'Aperte Parar para voltar a editar.',
     });
+    // O bloco "dizer" escreve na tela do jogo.
+    this.assembler.aoDizer = (texto) => this.hudJogo.dizer(texto);
     this.hudJogo.element.hidden = true;
     this.engine.add(this.hudJogo.system());
     this.engine.add(
@@ -276,6 +283,33 @@ export class Editor {
     this.document.setField(node.id, component, field, value);
   }
 
+  // --- Programar ------------------------------------------------------------
+
+  abrirScript(): void {
+    if (!this.selectedNode) return;
+    this.scriptAberto = true;
+    this.notify();
+  }
+
+  fecharScript(): void {
+    this.scriptAberto = false;
+    this.notify();
+  }
+
+  /**
+   * Troca o script da peça selecionada.
+   *
+   * Cada mudança entra no desfazer com a mesma chave, para uma sessão de
+   * edição de blocos virar um passo de Ctrl+Z e não trinta.
+   */
+  setScript(script: Script | null): void {
+    const node = this.selectedNode;
+    if (!node) return;
+    this.history.record('programar', `script:${node.id}`);
+    this.document.setScript(node.id, script);
+    this.notify();
+  }
+
   rename(name: string): void {
     const node = this.selectedNode;
     if (!node) return;
@@ -379,6 +413,14 @@ export class Editor {
     this.hudJogo.element.hidden = false;
 
     this.assembler.startPlay();
+
+    // O que os scripts reclamaram aparece na barra, com a peça culpada pelo
+    // nome: erro de script não pode ficar escondido no console.
+    const erro = this.assembler.errosDeScript[0];
+    if (erro) {
+      this.aviso(`${erro.nome}: ${erro.mensagem}${erro.sugestao ? ` ${erro.sugestao}` : ''}`);
+    }
+
     this.notify();
   }
 

@@ -1,3 +1,4 @@
+import { imprimir, ler } from '@faisca/blocos';
 import {
   FORMAT_VERSION,
   identityTransform,
@@ -67,6 +68,14 @@ function writeNode(node: SceneNode): string {
   const componentes = Object.entries(node.fields).filter(
     ([, values]) => Object.keys(values).length > 0,
   );
+  if (node.script && node.script.corpo.length > 0) {
+    // O script vai para o arquivo como *codigo*, e nao como a arvore em JSON.
+    // As duas formas guardam a mesma coisa — a ida e volta e sem perda —, mas
+    // so uma delas faz o `git diff` dizer "mudou a força da mola de 20 para
+    // 30" em vez de despejar trinta linhas de objeto aninhado.
+    partes.push(`"script": ${JSON.stringify(imprimir(node.script))}`);
+  }
+
   if (componentes.length > 0) {
     const corpo = componentes
       .map(([componente, values]) => {
@@ -137,7 +146,12 @@ function readNode(bruto: unknown, indice: number): SceneNode {
     sz: escala[2],
   };
 
+  // Peca sem script nao ganha a chave: o no que sai do arquivo fica igual ao
+  // no que entrou, e a ida e volta continua comparavel campo a campo.
+  const script = readScript(no.script);
+
   return {
+    ...(script ? { script } : {}),
     id: typeof no.id === 'string' ? no.id : `n${indice + 1}`,
     name: typeof no.nome === 'string' ? no.nome : peca,
     piece: peca,
@@ -147,6 +161,18 @@ function readNode(bruto: unknown, indice: number): SceneNode {
     color: readColor(no.cor),
     visible: no.oculto !== true,
   };
+}
+
+/**
+ * Le o script de volta.
+ *
+ * Um script que nao le vira `null`, e nao uma explosao: um arquivo estragado
+ * pode custar o script daquela peca, mas nao pode custar a fase inteira.
+ */
+function readScript(bruto: unknown): SceneNode['script'] {
+  if (typeof bruto !== 'string' || bruto.trim() === '') return null;
+  const leitura = ler(bruto);
+  return leitura.ok ? leitura.script : null;
 }
 
 function readFields(bruto: unknown): Record<string, Record<string, number>> {

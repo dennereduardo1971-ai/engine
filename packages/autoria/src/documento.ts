@@ -14,6 +14,8 @@
  *    montador corrige o mundo vivo sem reiniciar a fase (secao 8 do plano).
  */
 
+import { type Script } from '@faisca/blocos';
+
 /** Onde o no esta, para onde aponta e o tamanho dele. */
 export interface NodeTransform {
   x: number;
@@ -50,6 +52,14 @@ export interface SceneNode {
   /** Cor propria, ou `null` para usar a da peca. */
   color: number | null;
   visible: boolean;
+  /**
+   * O script da peca — a arvore da secao 7, guardada aqui inteira.
+   *
+   * E a arvore, e nao o texto do codigo: o texto e uma das *visoes* dela, e
+   * guardar uma visao como se fosse o original e exatamente o erro que a
+   * secao 7 manda nao cometer.
+   */
+  script?: Script | null;
 }
 
 export interface SceneData {
@@ -71,6 +81,7 @@ export type SceneChange =
   | { kind: 'fields'; id: string; component: string }
   | { kind: 'appearance'; id: string }
   | { kind: 'name'; id: string }
+  | { kind: 'script'; id: string }
   | { kind: 'parent'; id: string }
   /** O documento inteiro foi trocado (carregar arquivo, desfazer). */
   | { kind: 'reload' };
@@ -91,6 +102,7 @@ export interface AddOptions {
   visible?: boolean;
   /** Id fixo, usado ao carregar um arquivo. Sem isto, um id novo e gerado. */
   id?: string;
+  script?: Script | null;
 }
 
 export class SceneDocument {
@@ -159,6 +171,7 @@ export class SceneDocument {
       fields: cloneFields(options.fields ?? {}),
       color: options.color ?? null,
       visible: options.visible ?? true,
+      script: options.script ?? null,
     };
     this.byId.set(id, node);
     this.order.push(id);
@@ -199,6 +212,21 @@ export class SceneDocument {
       changed = true;
     }
     if (changed) this.emit({ kind: 'transform', id });
+  }
+
+  /**
+   * Troca o script de uma peca.
+   *
+   * A arvore entra por copia: quem editou continua com a dela, e o documento
+   * fica com a sua. Duas partes do editor apontando para a mesma arvore
+   * viravam, mais cedo ou mais tarde, uma mudanca que aparece antes de ser
+   * confirmada — ou um desfazer que nao desfaz.
+   */
+  setScript(id: string, script: Script | null): void {
+    const node = this.byId.get(id);
+    if (!node) return;
+    node.script = script ? structuredClone(script) : null;
+    this.emit({ kind: 'script', id });
   }
 
   setField(id: string, component: string, field: string, value: number): void {
@@ -274,6 +302,7 @@ export class SceneDocument {
         fields: node.fields,
         color: node.color,
         visible: node.visible,
+        script: node.script,
       });
       remap.set(node.id, copy.id);
       first ??= copy;
@@ -322,6 +351,7 @@ export class SceneDocument {
         fields: cloneFields(node.fields ?? {}),
         color: node.color ?? null,
         visible: node.visible !== false,
+        script: node.script ?? null,
       };
       this.byId.set(copy.id, copy);
       this.order.push(copy.id);

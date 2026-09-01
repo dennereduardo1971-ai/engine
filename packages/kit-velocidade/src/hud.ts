@@ -59,6 +59,13 @@ const CSS = `
 .faisca-hud-jogo .cartao .linha span:last-child { font-variant-numeric: tabular-nums; font-weight: 700; }
 .faisca-hud-jogo .venceu h2 { color: #4ade80; }
 .faisca-hud-jogo .perdeu h2 { color: #f87171; }
+.faisca-hud-jogo .recado {
+  position: absolute; left: 50%; bottom: 15%; transform: translateX(-50%);
+  max-width: 70%; padding: 12px 20px; border-radius: 12px; text-align: center;
+  font-size: 17px; background: rgba(20,25,35,0.92);
+  border: 1px solid rgba(255,255,255,0.16);
+}
+.faisca-hud-jogo .recado[hidden] { display: none; }
 .faisca-hud-jogo .recorde { color: #f5c542; font-size: 13px; margin-top: 12px; }
 `;
 
@@ -74,6 +81,8 @@ export class GameHud {
   private readonly tempo: HTMLElement;
   private readonly placar: HTMLElement;
   private readonly fim: HTMLElement;
+  private readonly recado: HTMLElement;
+  private recadoAte = 0;
   private estadoMostrado: string | null = null;
   /** Texto extra no cartao de fim: recorde novo, por exemplo. */
   recorde = '';
@@ -98,6 +107,7 @@ export class GameHud {
         <span class="item vidas"><span class="icone">❤️</span><b data-vidas>3</b></span>
         <span class="item"><span class="icone">⏱️</span><b data-tempo>0:00</b></span>
       </div>
+      <div class="recado" hidden></div>
       <div class="fim" hidden></div>`;
     parent.append(this.element);
 
@@ -106,6 +116,7 @@ export class GameHud {
     this.tempo = this.element.querySelector('[data-tempo]') as HTMLElement;
     this.placar = this.element.querySelector('.placar') as HTMLElement;
     this.fim = this.element.querySelector('.fim') as HTMLElement;
+    this.recado = this.element.querySelector('.recado') as HTMLElement;
   }
 
   /** O sistema que redesenha o HUD. Ultima coisa da fase de render. */
@@ -118,8 +129,21 @@ export class GameHud {
     });
   }
 
+  /**
+   * Mostra um recado por alguns segundos — e para onde vai o bloco "dizer".
+   *
+   * O tempo corre pelo relogio da partida, e nao por um `setTimeout`: assim o
+   * recado congela junto com o jogo quando alguem aperta Pausar.
+   */
+  dizer(texto: string, segundos = 3): void {
+    this.recado.textContent = texto;
+    this.recado.hidden = texto.length === 0;
+    this.recadoAte = this.partida.tempo + segundos;
+  }
+
   refresh(): void {
     const p = this.partida;
+    if (!this.recado.hidden && p.tempo > this.recadoAte) this.recado.hidden = true;
     this.aneis.textContent = String(p.aneis);
     this.vidas.textContent = String(p.vidas);
     this.tempo.textContent = formatarTempo(p.tempo);

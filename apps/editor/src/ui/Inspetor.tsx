@@ -45,6 +45,11 @@ export function Inspetor({ editor }: { editor: Editor }) {
       </h2>
 
       <div className="bloco">
+        <button className="programar-abrir" onClick={() => editor.abrirScript()}>
+          {node.script && node.script.corpo.length > 0
+            ? `Programar — ${node.script.corpo.length} bloco${node.script.corpo.length > 1 ? 's' : ''}`
+            : 'Programar esta peça'}
+        </button>
         <label className="campo">
           <span className="rotulo">Nome</span>
           <Texto valor={node.name} onChange={(valor) => editor.rename(valor)} />

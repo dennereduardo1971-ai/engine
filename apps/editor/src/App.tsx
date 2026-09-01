@@ -4,6 +4,7 @@ import { Arvore } from './ui/Arvore.tsx';
 import { Barra } from './ui/Barra.tsx';
 import { Inspetor } from './ui/Inspetor.tsx';
 import { Pecas } from './ui/Pecas.tsx';
+import { Programar } from './ui/Programar.tsx';
 
 /**
  * O editor v0 da Faisca (M3).
@@ -68,6 +69,7 @@ export function App() {
 
         <div className="palco" ref={palco}>
           <canvas ref={canvas} />
+          {editor ? <Programar editor={editor} /> : null}
           <div className="teclas">
             <b>botão esquerdo</b> seleciona e arrasta · <b>direito</b> gira a câmera ·{' '}
             <b>meio</b> arrasta a vista · <b>roda</b> aproxima · <b>R</b> gira 45° ·{' '}

@@ -42,9 +42,23 @@ A regra do dano é a do Sonic, e é ela que faz o anel valer alguma coisa: **com
 perde os anéis; sem anel, perde uma vida.** Um jogo em que encostar num inimigo tira uma
 vida direto castiga quem está aprendendo — e quem está aprendendo aqui tem seis anos.
 
-Próxima fatia: **M5** — blocos ⇄ código, a decisão mais importante do projeto (seção 7):
-os blocos visuais e o TypeScript são duas visões da *mesma* árvore, com ida e volta sem
-perdas.
+E, com a **M5**, dá para **programar as peças** — a decisão que a seção 7 do plano chama de
+a mais importante do projeto.
+
+Blocos e TypeScript não são dois sistemas que se convertem um no outro: são duas visões da
+**mesma árvore**. Você abre uma peça, monta o comportamento com blocos, clica em *Código*,
+edita uma linha, volta para *Blocos* — e o bloco mudou. Não há conversão, então não há nada
+para se perder no caminho; até os comentários têm lugar na árvore, como blocos de nota.
+
+O script roda direto na árvore, sem `eval` e sem compilar: o que a criança vê é o que roda.
+E se ela escrever `while (true) {}` — que é uma das primeiras coisas que alguém escreve sem
+querer — o script para sozinho e explica, em vez de travar a aba.
+
+Os erros são em português, apontam o bloco culpado e dão um palpite:
+*"Não conheço o bloco `darAneiss`. Você quis dizer `darAneis`?"*
+
+Próxima fatia: **M6** — gatilho-e-resposta e o perfil Design: montar "quando o jogador
+entra aqui → abre a porta e toca som" só apontando e clicando, sem código visível.
 
 ### O que é guardado, e onde
 
@@ -52,6 +66,17 @@ O recorde de cada fase — se você chegou ao fim, o melhor tempo e o recorde de
 no `localStorage` do navegador, na sua máquina, e em lugar nenhum além dela. É a seção 13
 do plano valendo: **zero telemetria**. Se o navegador recusar gravar (aba anônima, por
 exemplo), o jogo roda igual, só não guarda recorde.
+
+### Programar uma peça
+
+Clique numa peça, aperte **Programar** e escolha um bloco de *quando* — ele é o chapéu que
+segura os outros. Três eventos existem hoje: *quando a fase começa*, *a cada quadro* e
+*quando o jogador encostar em mim*.
+
+O script fica salvo no arquivo `.cena` como **código**, e não como árvore em JSON: é o que
+faz um `git diff` dizer "mudou a força da mola de 20 para 30" em vez de despejar trinta
+linhas de objeto aninhado. As duas formas guardam a mesma coisa — a ida e volta é sem
+perda, e há teste para isso.
 
 ### Arestas conhecidas
 
@@ -63,6 +88,11 @@ exemplo), o jogo roda igual, só não guarda recorde.
 - Anel, mola e meta são detectados por distância, e não por colisor: é O(quantidade de
   brinquedos) por quadro. Custa nada com os milhares de uma fase, e vai precisar de uma
   grade espacial se um dia forem dezenas de milhares.
+- No editor de blocos não há arrastar e soltar ainda: mover um bloco é pelas setas ↑ ↓.
+- Conta e chamada dentro de um bloco (`meuY() + 3`) aparecem como texto e só se editam na
+  aba de código. Número, texto e sim/não se editam no bloco.
+- Comentário só vale como linha inteira. Um `//` no fim de uma linha de código vira um
+  bloco de nota na linha seguinte — não se perde, mas muda de lugar.
 - A mola só atira para cima. O editor gira peças em guinada (em torno do Y), e girar a
   mola em torno do Y não muda para onde ela aponta — atirar de lado exige inclinar, que o
   formato de cena ainda não guarda.
@@ -182,6 +212,7 @@ packages/runtime/       # a engine: ECS, laço, entrada, render, orçamento
   src/debug/            # painel de performance
 packages/kit-velocidade/  # o coração Sonic: personagem, câmera, anéis, molas, meta, HUD
 packages/kit-inimigos/  # patrulheiro agora; perseguidor, atirador e voador depois
+packages/blocos/        # a árvore única: blocos, código, conferidor e interpretador
 packages/autoria/       # documento de cena, formato .cena, peças, desfazer, montador
 apps/editor/            # o editor: viewport, árvore, inspetor, peças, teste ao vivo
 apps/playground/        # a cena de referência que mede a máquina

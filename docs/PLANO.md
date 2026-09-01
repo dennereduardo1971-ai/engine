@@ -276,7 +276,7 @@ Entrega em fatias. Cada fatia é um pull request, e termina com **algo que você
 > de malha no Rapier, do jeito que ela é desenhada, e o que se vê é o que se colide.
 
 ### Mês 2 — Autoria de verdade
-M5 blocos ⇄ código · M6 gatilho-e-resposta e perfil Design · M7 spline de pista · M8 importação de assets e kit inicial
+M5 ✅ blocos ⇄ código · M6 gatilho-e-resposta e perfil Design · M7 spline de pista · M8 importação de assets e kit inicial
 
 ### Mês 3 — Família
 M9 editor de interface e menus · M10 diálogos e cutscenes · M11 publicar link + galeria · M12 Modo Criança com narração

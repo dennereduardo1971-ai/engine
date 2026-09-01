@@ -2,10 +2,12 @@ import * as THREE from 'three';
 import {
   type Collider,
   componentRegistry,
+  defineSystem,
   type Entity,
   type InstancedBatch,
   type PhysicsWorld,
   placeAt,
+  type System,
   Transform,
   type World,
 } from '@faisca/runtime';
@@ -13,10 +15,18 @@ import {
   FollowCamera,
   makeFollowCamera,
   makeSpeedCharacter,
+  type Partida,
   resetTrackToys,
   SpeedCharacter,
 } from '@faisca/kit-velocidade';
 import { resetPatrollers } from '@faisca/kit-inimigos';
+import {
+  conferir,
+  Instancia,
+  type Ambiente,
+  type ErroDeExecucao,
+  type Valor,
+} from '@faisca/blocos';
 import { type SceneChange, type SceneDocument, type SceneNode } from './documento.ts';
 import { type Piece, pieceGeometry, pieceOrPlaceholder, scaledTrimesh } from './pecas.ts';
 import { worldPlacement, yawQuaternion } from './transformacoes.ts';
@@ -47,6 +57,23 @@ export interface AssemblerHost {
   ): InstancedBatch;
 }
 
+/** Um script vivo, ligado a peca dele. */
+export interface ScriptVivo {
+  node: string;
+  entity: Entity;
+  instancia: Instancia;
+  /** O jogador esta perto agora? Serve para disparar o toque uma vez so. */
+  encostado: boolean;
+}
+
+/** Um script que deu errado, com o nome da peca para o editor mostrar. */
+export interface ErroDeScript {
+  node: string;
+  nome: string;
+  mensagem: string;
+  sugestao?: string;
+}
+
 interface Built {
   node: string;
   entity: Entity;
@@ -67,6 +94,9 @@ export interface SpawnPoint {
 
 const CAPACIDADE_PADRAO = 4_000;
 
+/** A que distancia o bloco "quando o jogador encostar em mim" dispara. */
+const TOQUE = 2.2;
+
 export class SceneAssembler {
   private readonly built = new Map<string, Built>();
   private readonly byEntity = new Map<Entity, string>();
@@ -77,6 +107,15 @@ export class SceneAssembler {
   /** Personagem do teste ao vivo, ou -1 fora do teste. */
   hero: Entity = -1;
   cameraEntity: Entity = -1;
+
+  /** Os scripts rodando agora, um por peça que tem script. */
+  private readonly scripts: ScriptVivo[] = [];
+  /** O que os scripts reclamaram nesta partida. */
+  readonly errosDeScript: ErroDeScript[] = [];
+  /** Para onde vai o bloco "dizer". O editor põe o HUD aqui. */
+  aoDizer: ((texto: string) => void) | null = null;
+  /** O placar da partida, para os blocos de jogo. O editor liga aqui. */
+  partida: Partida | null = null;
 
   constructor(
     private readonly host: AssemblerHost,
@@ -168,7 +207,178 @@ export class SceneAssembler {
 
     this.hero = hero;
     this.cameraEntity = camera;
+    this.acenderScripts();
     return hero;
+  }
+
+  /**
+   * Cria um script vivo por peca que tem script, e dispara "AoComecar".
+   *
+   * O que o conferidor reclamar entra em `errosDeScript` e a peca fica de
+   * fora. Um script com erro nao pode derrubar o teste da fase inteira: quem
+   * escreveu precisa poder rodar o resto e ver o recado.
+   */
+  private acenderScripts(): void {
+    this.errosDeScript.length = 0;
+    this.scripts.length = 0;
+
+    for (const node of this.document.nodes) {
+      const script = node.script;
+      if (!script || script.corpo.length === 0) continue;
+      const built = this.built.get(node.id);
+      if (!built) continue;
+
+      const problemas = conferir(script);
+      if (problemas.length > 0) {
+        this.errosDeScript.push({
+          node: node.id,
+          nome: node.name,
+          mensagem: problemas[0].mensagem,
+          sugestao: problemas[0].sugestao,
+        });
+        continue;
+      }
+
+      const instancia = new Instancia(script, this.ambienteDe(node, built.entity));
+      const vivo: ScriptVivo = { node: node.id, entity: built.entity, instancia, encostado: false };
+      this.scripts.push(vivo);
+      this.anotarErro(vivo, instancia.iniciar());
+      this.anotarErro(vivo, instancia.disparar('AoComecar'));
+    }
+  }
+
+  /**
+   * O mundo, do ponto de vista de um script.
+   *
+   * Cada peca ganha o seu: `meuX` e o x *dela*, e `mover` move *ela*. E isso
+   * que deixa o mesmo script servir para dez inimigos sem nenhum deles saber
+   * que os outros existem.
+   */
+  private ambienteDe(node: SceneNode, entity: Entity): Ambiente {
+    const t = Transform.fields;
+    const vaga = (): number => Transform.slotOf(entity);
+
+    const girarPara = (ts: number, yaw: number): void => {
+      const meio = yaw * 0.5;
+      t.qx[ts] = 0;
+      t.qy[ts] = Math.sin(meio);
+      t.qz[ts] = 0;
+      t.qw[ts] = Math.cos(meio);
+    };
+
+    const distanciaAteOHeroi = (ts: number): number => {
+      const hs = this.hero >= 0 ? Transform.slotOf(this.hero) : -1;
+      if (hs < 0) return Infinity;
+      return Math.hypot(t.x[hs] - t.x[ts], t.y[hs] - t.y[ts], t.z[hs] - t.z[ts]);
+    };
+
+    return {
+      chamar: (nome: string, argumentos: Valor[]): Valor | void => {
+        const numero = (i: number): number => {
+          const valor = argumentos[i];
+          return typeof valor === 'number' ? valor : Number(valor) || 0;
+        };
+        const ts = vaga();
+        if (ts < 0 && nome !== 'dizer') return 0;
+
+        switch (nome) {
+          case 'mover':
+            t.x[ts] += numero(0);
+            t.y[ts] += numero(1);
+            t.z[ts] += numero(2);
+            return;
+          case 'irPara':
+            t.x[ts] = numero(0);
+            t.y[ts] = numero(1);
+            t.z[ts] = numero(2);
+            return;
+          case 'girar': {
+            const atual = Math.atan2(t.qy[ts], t.qw[ts]) * 2;
+            girarPara(ts, atual + (numero(0) * Math.PI) / 180);
+            return;
+          }
+          case 'empurrar': {
+            if (this.hero < 0) return;
+            const cs = SpeedCharacter.slotOf(this.hero);
+            if (cs < 0) return;
+            SpeedCharacter.fields.vy[cs] = numero(0);
+            SpeedCharacter.fields.grounded[cs] = 0;
+            SpeedCharacter.fields.noStick[cs] = 0.25;
+            return;
+          }
+          case 'darAneis':
+            this.partida?.coletar(Math.max(0, Math.round(numero(0))));
+            return;
+          case 'tirarVida':
+            this.partida?.levarDano();
+            return;
+          case 'terminarFase':
+            this.partida?.vencer();
+            return;
+          case 'esconder': {
+            t.sx[ts] = t.sy[ts] = t.sz[ts] = 0;
+            // Sumir da vista tem que sumir do caminho tambem. Uma peca
+            // invisivel que ainda barra o jogador e um bug que ninguem
+            // consegue ver — literalmente.
+            const built = this.built.get(node.id);
+            if (built?.collider) {
+              this.host.physics?.removeCollider(built.collider);
+              built.collider = null;
+            }
+            return;
+          }
+          case 'mostrar': {
+            const place = worldPlacement(this.document, node);
+            t.sx[ts] = place.sx;
+            t.sy[ts] = place.sy;
+            t.sz[ts] = place.sz;
+            const built = this.built.get(node.id);
+            if (built && !built.collider) this.rebuildCollider(node, built);
+            return;
+          }
+          case 'dizer':
+            this.aoDizer?.(String(argumentos[0] ?? ''));
+            return;
+          case 'meuX':
+            return t.x[ts];
+          case 'meuY':
+            return t.y[ts];
+          case 'meuZ':
+            return t.z[ts];
+          case 'aneis':
+            return this.partida?.aneis ?? 0;
+          case 'tempo':
+            return this.partida?.tempo ?? 0;
+          case 'distanciaDoJogador':
+            return distanciaAteOHeroi(ts);
+          case 'aleatorio': {
+            const minimo = Math.round(numero(0));
+            const maximo = Math.round(numero(1));
+            const menor = Math.min(minimo, maximo);
+            const maior = Math.max(minimo, maximo);
+            return menor + Math.floor(Math.random() * (maior - menor + 1));
+          }
+          default:
+            throw new Error(`Não conheço o bloco "${nome}".`);
+        }
+      },
+      constante: (nome: string): Valor | undefined => {
+        if (nome === 'CIMA') return 1;
+        if (nome === 'BAIXO') return -1;
+        return undefined;
+      },
+    };
+  }
+
+  private anotarErro(vivo: ScriptVivo, erro: ErroDeExecucao | null): void {
+    if (!erro) return;
+    const node = this.document.get(vivo.node);
+    this.errosDeScript.push({
+      node: vivo.node,
+      nome: node?.name ?? vivo.node,
+      mensagem: erro.mensagem,
+      sugestao: erro.sugestao,
+    });
   }
 
   stopPlay(): void {
@@ -186,6 +396,7 @@ export class SceneAssembler {
     // derrotado levanta, mola disparada descarrega. Sem isto, testar a fase a
     // consumiria — a segunda vez que a mae apertasse Jogar, metade dos aneis
     // teria sumido do projeto dela.
+    this.scripts.length = 0;
     resetTrackToys();
     resetPatrollers();
     for (const node of this.document.nodes) this.place(node);
@@ -193,6 +404,41 @@ export class SceneAssembler {
 
   get playing(): boolean {
     return this.hero >= 0;
+  }
+
+  /**
+   * O sistema que faz os scripts andarem.
+   *
+   * Ele dispara "a cada quadro" em todo script vivo e "quando o jogador
+   * encostar" na borda de entrada — uma vez por chegada, e nao a cada quadro
+   * em que o jogador ainda esta perto. Sem essa borda, encostar num inimigo
+   * com um "tirar uma vida" dentro tiraria sessenta vidas por segundo.
+   */
+  scriptSystem(): System {
+    return defineSystem({
+      name: 'Scripts',
+      phase: 'logic',
+      order: 120,
+      update: () => {
+        if (this.scripts.length === 0) return;
+        const t = Transform.fields;
+        const hs = this.hero >= 0 ? Transform.slotOf(this.hero) : -1;
+
+        for (const vivo of this.scripts) {
+          this.anotarErro(vivo, vivo.instancia.disparar('ACadaQuadro'));
+
+          if (hs < 0) continue;
+          const ts = Transform.slotOf(vivo.entity);
+          if (ts < 0) continue;
+          const perto =
+            Math.hypot(t.x[hs] - t.x[ts], t.y[hs] - t.y[ts], t.z[hs] - t.z[ts]) < TOQUE;
+          if (perto && !vivo.encostado) {
+            this.anotarErro(vivo, vivo.instancia.disparar('AoEncostar', 'jogador'));
+          }
+          vivo.encostado = perto;
+        }
+      },
+    });
   }
 
   // --- Reagir ao documento --------------------------------------------------

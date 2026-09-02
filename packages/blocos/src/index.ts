@@ -51,6 +51,24 @@ export { imprimir, imprimirExpressao, imprimirInstrucao, textoEmCodigo } from '.
 export { ler, type ErroDeLeitura, type Leitura } from './ler.ts';
 export { conferir, sugerir, type Problema } from './conferir.ts';
 export {
+  cabeEmRegras,
+  moverAcao,
+  novaAcao,
+  novaRegra,
+  porAcao,
+  porRegra,
+  regrasDe,
+  scriptDeRegras,
+  tirar,
+  trocarEvento,
+  trocarValor,
+  type AcaoDeRegra,
+  type Regra,
+  type ValorDeRegra,
+  type VistaDeRegras,
+} from './regras.ts';
+
+export {
   Instancia,
   type Ambiente,
   type ErroDeExecucao,

@@ -21,18 +21,34 @@ import {
 } from '@faisca/blocos';
 import { type Editor } from '../editor.ts';
 import { pararTeclas } from './campos.tsx';
+import { Regras } from './Regras.tsx';
+
+type Aba = 'regras' | 'blocos' | 'codigo';
 
 /**
- * O painel de programacao — as duas visoes da secao 7, lado a lado no tempo.
+ * O painel de programacao — as tres visoes da secao 7, lado a lado no tempo.
  *
- * Nao ha conversao entre elas. A aba "blocos" desenha a arvore; a aba
- * "codigo" escreve a arvore; trocar de aba nao converte nada, so muda quem
- * esta desenhando. E por isso que editar uma linha de codigo e voltar mostra o
- * bloco ja mudado.
+ * Nao ha conversao entre elas. A aba "regras" desenha o gatilho-e-resposta, a
+ * aba "blocos" desenha a arvore inteira e a aba "codigo" escreve a arvore;
+ * trocar de aba nao converte nada, so muda quem esta desenhando. E por isso
+ * que editar uma linha de codigo e voltar mostra o bloco ja mudado, e que uma
+ * regra montada apontando e clicando aparece como bloco do outro lado.
+ *
+ * Quais abas existem e o perfil quem decide (secao 8): Design ve so regras,
+ * Criador ve regras e blocos, Programador ve as tres.
  */
 export function Programar({ editor }: { editor: Editor }) {
   const node = editor.selectedNode;
-  const [aba, setAba] = useState<'blocos' | 'codigo'>('blocos');
+  const mostra = editor.mostra;
+  const abas: Aba[] = [
+    ...(mostra.regras ? (['regras'] as const) : []),
+    ...(mostra.blocos ? (['blocos'] as const) : []),
+    ...(mostra.codigo ? (['codigo'] as const) : []),
+  ];
+  const [escolhida, setAba] = useState<Aba>('regras');
+  // Trocar para um perfil mais simples nao pode deixar o painel numa aba que
+  // ele nao mostra mais: a pessoa ficaria olhando para um painel vazio.
+  const aba: Aba = abas.includes(escolhida) ? escolhida : (abas[0] ?? 'regras');
   const [rascunho, setRascunho] = useState('');
   const [erroDeTexto, setErroDeTexto] = useState<string | null>(null);
 
@@ -49,7 +65,7 @@ export function Programar({ editor }: { editor: Editor }) {
 
   const problemas = useMemo(() => (script ? conferir(script) : []), [script]);
 
-  if (!editor.scriptAberto || !node) return null;
+  if (!editor.scriptAberto || !node || abas.length === 0) return null;
 
   const trocar = (novo: Script): void => editor.setScript(novo);
 
@@ -71,26 +87,26 @@ export function Programar({ editor }: { editor: Editor }) {
     <div className="programar">
       <header>
         <h2>
-          Programar<small>{node.name}</small>
+          {mostra.blocos ? 'Programar' : 'Regras'}
+          <small>{node.name}</small>
         </h2>
         <div className="abas">
-          <button
-            className={aba === 'blocos' ? 'ativa' : ''}
-            onClick={() => setAba('blocos')}
-          >
-            Blocos
-          </button>
-          <button
-            className={aba === 'codigo' ? 'ativa' : ''}
-            onClick={() => setAba('codigo')}
-          >
-            Código
-          </button>
+          {abas.map((candidata) => (
+            <button
+              key={candidata}
+              className={aba === candidata ? 'ativa' : ''}
+              onClick={() => setAba(candidata)}
+            >
+              {rotuloDaAba(candidata)}
+            </button>
+          ))}
         </div>
         <button className="fechar" onClick={() => editor.fecharScript()}>
           Fechar
         </button>
       </header>
+
+      {aba === 'regras' ? <Regras editor={editor} node={node} /> : null}
 
       {aba === 'blocos' ? (
         <div className="conteudo">
@@ -121,7 +137,9 @@ export function Programar({ editor }: { editor: Editor }) {
             </ul>
           ) : null}
         </div>
-      ) : (
+      ) : null}
+
+      {aba === 'codigo' ? (
         <div className="conteudo codigo">
           <textarea
             value={rascunho}
@@ -140,9 +158,15 @@ export function Programar({ editor }: { editor: Editor }) {
             </span>
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
+}
+
+function rotuloDaAba(aba: Aba): string {
+  if (aba === 'regras') return 'Regras';
+  if (aba === 'blocos') return 'Blocos';
+  return 'Código';
 }
 
 // --- Os blocos ---------------------------------------------------------------
@@ -448,7 +472,7 @@ function Gaveta({ topo, inserir }: { topo: boolean; inserir: (instrucao: Instruc
         <option value="controle:criar">criar uma caixinha</option>
         <option value="controle:nota">nota</option>
       </optgroup>
-      {(['movimento', 'jogo', 'valores'] as const).map((categoria) => (
+      {(['movimento', 'cena', 'jogo', 'valores'] as const).map((categoria) => (
         <optgroup key={categoria} label={rotuloDaCategoria(categoria)}>
           {BLOCOS.filter((bloco) => bloco.categoria === categoria && bloco.devolve === null).map(
             (bloco) => (
@@ -465,6 +489,7 @@ function Gaveta({ topo, inserir }: { topo: boolean; inserir: (instrucao: Instruc
 
 function rotuloDaCategoria(categoria: string): string {
   if (categoria === 'movimento') return 'Movimento';
+  if (categoria === 'cena') return 'Outras peças';
   if (categoria === 'jogo') return 'Jogo';
   return 'Valores';
 }

@@ -11,6 +11,7 @@ import {
   makeSpeedCharacter,
   SpeedCharacter,
 } from '@faisca/kit-velocidade';
+import { Porta } from '@faisca/kit-brinquedos';
 
 /**
  * O que o inspetor mostra de cada componente.
@@ -110,6 +111,21 @@ const SPECS: readonly ComponentSpec[] = [
       { field: 'fovSpeed', label: 'Velocidade do campo cheio', min: 1, max: 60, step: 1 },
     ],
   },
+  {
+    component: 'Porta',
+    label: 'Porta',
+    fields: [
+      {
+        field: 'travel',
+        label: 'Quanto desce',
+        min: 0,
+        max: 30,
+        step: 0.5,
+        hint: 'Um pouco mais que a altura dela some a porta inteira no chão.',
+      },
+      { field: 'speed', label: 'Velocidade', min: 0.5, max: 40, step: 0.5, unit: 'u/s' },
+    ],
+  },
 ];
 
 const BY_COMPONENT = new Map(SPECS.map((spec) => [spec.component, spec]));
@@ -180,6 +196,8 @@ function lerValoresDeFabrica(): Record<string, Record<string, number>> {
   saida[SpeedCharacter.name] = lerCampos(SpeedCharacter, rascunho);
   makeFollowCamera(rascunho, rascunho);
   saida[FollowCamera.name] = lerCampos(FollowCamera, rascunho);
+  Porta.add(rascunho);
+  saida[Porta.name] = lerCampos(Porta, rascunho);
 
   mundo.destroy(rascunho);
   return saida;

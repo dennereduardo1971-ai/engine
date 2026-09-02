@@ -1,0 +1,57 @@
+name: Publicar no Pages
+
+on:
+  push:
+    branches:
+      - claude/family-game-engine-58vsf6
+      - claude/analise-plano-repositorio-kmr3o5
+  workflow_dispatch:
+
+# O que o deploy do Pages exige: ler o código, escrever a publicação e provar
+# quem é para o GitHub sem guardar segredo nenhum.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Uma publicação de cada vez. Duas ao mesmo tempo se atropelam, e a última a
+# terminar — que não é necessariamente a mais nova — venceria.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.publicacao.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # A mesma barreira do CI: nada é publicado sem os tipos baterem, os
+      # testes passarem e o orçamento de performance caber.
+      - name: Tipos
+        run: npm run typecheck
+
+      - name: Testes e orçamento
+        run: npm test
+
+      - name: Montar o site
+        run: npm run site
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: publicacao
+        uses: actions/deploy-pages@v4

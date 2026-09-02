@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Faísca — uma engine de jogos para a família</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>%E2%9A%A1</text></svg>"
+    />
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        padding: 6vh 24px 60px;
+        font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+        color: #e6e9f0;
+        background: radial-gradient(1200px 600px at 50% -10%, #1c2540 0%, #0e1117 60%);
+      }
+      main { max-width: 880px; margin: 0 auto; }
+      .marca { display: flex; align-items: baseline; gap: 12px; }
+      h1 { margin: 0; font-size: 44px; letter-spacing: -1.2px; }
+      .marca span { font-size: 13px; padding: 3px 10px; border-radius: 999px;
+        background: rgba(245,197,66,0.14); color: #f5c542; border: 1px solid rgba(245,197,66,0.3); }
+      .linha-fina { margin: 10px 0 6px; font-size: 19px; opacity: 0.85; }
+      .meta { margin: 0 0 36px; font-size: 14px; opacity: 0.55; }
+
+      .cartoes { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+      a.cartao {
+        display: block; padding: 22px 24px; border-radius: 14px; text-decoration: none;
+        color: inherit; background: rgba(255,255,255,0.045);
+        border: 1px solid rgba(255,255,255,0.1); transition: background 120ms, transform 120ms;
+      }
+      a.cartao:hover { background: rgba(255,255,255,0.08); transform: translateY(-2px); }
+      a.cartao h2 { margin: 0 0 6px; font-size: 20px; }
+      a.cartao .icone { font-size: 26px; display: block; margin-bottom: 10px; }
+      a.cartao p { margin: 0; font-size: 14px; opacity: 0.7; }
+      a.cartao.destaque { border-color: rgba(74,222,128,0.4); background: rgba(74,222,128,0.07); }
+
+      section { margin-top: 44px; }
+      h3 { margin: 0 0 14px; font-size: 15px; text-transform: uppercase;
+        letter-spacing: 0.1em; opacity: 0.5; font-weight: 600; }
+      ul { margin: 0; padding-left: 20px; }
+      li { margin-bottom: 7px; font-size: 15px; }
+      li b { color: #f5c542; font-weight: 600; }
+      .aviso {
+        margin-top: 40px; padding: 16px 20px; border-radius: 12px; font-size: 14px;
+        background: rgba(245,197,66,0.08); border: 1px solid rgba(245,197,66,0.25); line-height: 1.65;
+      }
+      footer { margin-top: 44px; font-size: 13px; opacity: 0.45; }
+      footer a { color: inherit; }
+      kbd { padding: 1px 6px; border: 1px solid rgba(255,255,255,0.22); border-radius: 4px; font-size: 13px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="marca">
+        <h1>⚡ Faísca</h1>
+        <span>versão de teste</span>
+      </div>
+      <p class="linha-fina">Uma engine de jogos 2D e 3D feita para uma família criar jogos junto.</p>
+      <p class="meta">
+        60 fps num i5 com gráficos Intel integrados · TypeScript + Three.js + Rapier · sem telemetria
+      </p>
+
+      <div class="cartoes">
+        <a class="cartao destaque" href="./editor/">
+          <span class="icone">🧩</span>
+          <h2>Abrir o editor</h2>
+          <p>
+            Monte uma pista com peças, mexa nos valores, programe com blocos e aperte
+            <b>Jogar</b> para testar na hora. É por aqui que se começa.
+          </p>
+        </a>
+        <a class="cartao" href="./jogar/">
+          <span class="icone">🏃</span>
+          <h2>Cena de referência</h2>
+          <p>
+            Um bonequinho, um loop e milhares de anéis, com o medidor de performance ligado.
+            Serve para ver se esta máquina aguenta 60 fps.
+          </p>
+        </a>
+      </div>
+
+      <section>
+        <h3>O que já dá para fazer</h3>
+        <ul>
+          <li><b>Montar uma fase</b> — retas, rampas, curvas, loop, plataformas e cenário, com encaixe na grade.</li>
+          <li><b>Jogar do início ao fim</b> — anéis, molas, um inimigo patrulheiro, meta, vidas, tempo e recorde guardado.</li>
+          <li><b>Correr num loop</b> — física de verdade (Rapier), com superfície grudenta: a toda ele passa, devagar ele despenca.</li>
+          <li><b>Programar as peças</b> — blocos e TypeScript são a mesma árvore, com ida e volta sem perdas.</li>
+          <li><b>Montar regras sem código</b> — <i>quando o jogador chegar aqui → abre a porta e toca som</i>, só apontando e clicando. No perfil <b>Design</b>, código nenhum aparece na tela.</li>
+          <li><b>Controle de Xbox</b> — analógico esquerdo anda, direito olha, <kbd>A</kbd> pula. Sem controle: <kbd>WASD</kbd> e <kbd>espaço</kbd>.</li>
+        </ul>
+      </section>
+
+      <div class="aviso">
+        <b>Antes de testar:</b> use o Chrome, o Edge ou o Firefox no computador — ainda não há
+        controles de toque, então o celular abre mas não dá para jogar. O jogo roda melhor com um
+        controle de Xbox ligado. E nada do que você fizer sai da sua máquina: o recorde fica no
+        navegador, e a fase só sai daqui se você apertar <b>Baixar</b>.
+      </div>
+
+      <footer>
+        Código, plano e histórico em
+        <a href="https://github.com/dennereduardo1971-ai/engine">github.com/dennereduardo1971-ai/engine</a>
+        · licença MIT
+      </footer>
+    </main>
+  </body>
+</html>

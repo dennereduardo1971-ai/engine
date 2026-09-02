@@ -17,9 +17,10 @@ O jogo de referência é um **Sonic 3D**: velocidade, momentum, loops, molas, ra
 
 ## Estado
 
-**Mês 1 completo: M0, M1, M2, M3 e M4 entregues.** Uma janela 3D abre, o laço de passo fixo gira, o painel de
-performance responde a pergunta do M0 — *esta máquina aguenta 60 fps?* — com número na
-mão, e tem um bonequinho que anda com o controle de Xbox, com câmera que segue sozinha.
+**Mês 1 completo (M0 a M4) e mês 2 em andamento (M5 e M6 entregues).** Uma janela 3D abre,
+o laço de passo fixo gira, o painel de performance responde a pergunta do M0 — *esta
+máquina aguenta 60 fps?* — com número na mão, e tem um bonequinho que anda com o controle
+de Xbox, com câmera que segue sozinha.
 
 Tem **editor**: `npm run dev` abre uma tela onde dá para montar uma pista com peças, mexer
 nos valores num inspetor, apertar **Jogar** e correr na fase que você acabou de montar —
@@ -57,8 +58,43 @@ querer — o script para sozinho e explica, em vez de travar a aba.
 Os erros são em português, apontam o bloco culpado e dão um palpite:
 *"Não conheço o bloco `darAneiss`. Você quis dizer `darAneis`?"*
 
-Próxima fatia: **M6** — gatilho-e-resposta e o perfil Design: montar "quando o jogador
-entra aqui → abre a porta e toca som" só apontando e clicando, sem código visível.
+E, com a **M6**, existe a **regra**: *quando o jogador chega aqui → abre a porta e toca
+som*, montada só apontando e clicando, sem uma linha de código na tela.
+
+A regra não é um formato novo. Ela é a **terceira visão da mesma árvore**: um bloco
+*quando* com uma pilha de ações dentro. A mesma peça abre como regra no perfil Design,
+como bloco no Criador e como código no Programador — e nada é convertido no caminho.
+
+E o que a tela de regras não sabe desenhar — um *se*, uma conta dentro de um bloco — ela
+**conta e avisa**, em vez de esconder calado ou, pior, apagar: *"Esta peça tem 2 coisas
+fora das regras. Elas continuam valendo no jogo."* Editar pela tela de regras mexe no
+bloco apontado, e no resto não toca.
+
+Junto vieram as duas peças que fazem a frase inteira existir: a **Área**, que é o "aqui"
+(uma região invisível no jogo, e uma caixa de vidro no editor), e a **Porta**, que desce
+e libera a passagem — o primeiro brinquedo do kit Física-brinquedo. E o "toca som" toca
+mesmo: os sons são **sintetizados na hora**, sem arquivo nenhum, para caberem nos 15 MB
+que o plano dá a um jogo publicado e para funcionarem offline.
+
+A fase de exemplo já vem com essa regra montada, no pé da rampa.
+
+### Os quatro perfis
+
+A barra de cima tem um seletor de **perfil** — a seção 8 do plano. É a mesma engine e o
+mesmo projeto; muda só o que aparece na tela:
+
+| Perfil | Para quem | O que aparece |
+|---|---|---|
+| **Criança** | o filho | Chega na M12. Aparece na lista, desligado. |
+| **Design** | quem cria sem código | Cena, peças, cores e **regras**. Zero código visível. |
+| **Criador** | quem programa um pouco | Tudo do Design, mais os blocos e o passo-a-passo. |
+| **Programador** | quem programa | Tudo, mais o código do script e o painel de performance. |
+
+Trocar de perfil no meio do trabalho não mexe na fase: a peça programada com blocos
+continua programada quando alguém abre o projeto no Design — ela só não mostra os blocos.
+
+Próxima fatia: **M7** — a spline de pista: desenhar uma linha no espaço e ela virar
+estrada, com largura, inclinação e loops, e colisão gerada sozinha.
 
 ### O que é guardado, e onde
 
@@ -69,9 +105,15 @@ exemplo), o jogo roda igual, só não guarda recorde.
 
 ### Programar uma peça
 
-Clique numa peça, aperte **Programar** e escolha um bloco de *quando* — ele é o chapéu que
-segura os outros. Três eventos existem hoje: *quando a fase começa*, *a cada quadro* e
-*quando o jogador encostar em mim*.
+Clique numa peça, aperte **Programar** (ou **Criar uma regra**, no perfil Design) e escolha
+um bloco de *quando* — ele é o chapéu que segura os outros. Quatro eventos existem hoje:
+*quando a fase começa*, *a cada quadro*, *quando o jogador chegar aqui* e *quando o jogador
+sair daqui*.
+
+Chegar e sair são medidos pela **caixa da peça**, e não por um raio em volta dela: uma Área
+esticada para cobrir a entrada de um túnel dispara na entrada inteira. E são **bordas**:
+uma vez por chegada e uma por saída, e não sessenta vezes por segundo enquanto o jogador
+ainda está lá dentro.
 
 O script fica salvo no arquivo `.cena` como **código**, e não como árvore em JSON: é o que
 faz um `git diff` dizer "mudou a força da mola de 20 para 30" em vez de despejar trinta
@@ -96,6 +138,24 @@ perda, e há teste para isso.
 - A mola só atira para cima. O editor gira peças em guinada (em torno do Y), e girar a
   mola em torno do Y não muda para onde ela aponta — atirar de lado exige inclinar, que o
   formato de cena ainda não guarda.
+- A porta libera a passagem no instante do comando, e não no fim do movimento: nos dois
+  terços de segundo em que ela desliza, dá para atravessar o que ainda está na frente. O
+  contrário custaria mais — uma porta que já abriu na tela e ainda barra faz quem está
+  jogando achar que a regra não funcionou.
+- Uma regra aponta para outra peça pelo **nome** que aparece na árvore de cena. Renomear a
+  peça quebra a regra — e é por isso que o painel oferece uma lista em vez de um campo de
+  texto, e marca *(não existe mais)* quando o nome não bate com nada.
+- A caixa de gatilho é medida uma vez, quando o teste começa. Uma peça que se move leva a
+  zona junto; uma peça redimensionada com o jogo rodando, não.
+
+## Jogar sem instalar nada
+
+A cada mudança nesta branch, o GitHub Actions publica o editor e a cena de referência:
+
+**https://dennereduardo1971-ai.github.io/engine/**
+
+Use Chrome, Edge ou Firefox no computador. Ainda não há controles de toque, então o celular
+abre mas não dá para jogar. Nada do que você fizer sai da sua máquina.
 
 ## Como rodar
 
@@ -127,7 +187,7 @@ desmontar e entender.
 | **Peças** (esquerda, em cima) | Escolha uma e clique no chão para colocar. Sem peça na mão, o clique seleciona. |
 | **Cena** (esquerda, embaixo) | A árvore da fase. Clique para selecionar, no olho para esconder. |
 | **Inspetor** (direita) | Nome, pai, posição, giro, tamanho, cor — e os deslizadores dos componentes. |
-| **Barra** (em cima) | Nova, Exemplo, Baixar, Abrir, Desfazer, Refazer e o **Jogar**. |
+| **Barra** (em cima) | O **perfil**, Nova, Exemplo, Baixar, Abrir, Desfazer, Refazer e o **Jogar**. |
 
 No viewport: **botão esquerdo** seleciona e arrasta, **direito** gira a câmera, **meio**
 arrasta a vista, a **roda** aproxima. `R` gira 45°, `Del` apaga, `Ctrl+D` duplica,
@@ -209,11 +269,13 @@ packages/runtime/       # a engine: ECS, laço, entrada, render, orçamento
   src/input/            # ações, mapeamento de controles, gamepad de Xbox
   src/render/           # renderizador, qualidade adaptativa, instancing
   src/scene/            # Transform, Velocity e os sistemas de fundação
+  src/audio/            # os sons sintetizados
   src/debug/            # painel de performance
 packages/kit-velocidade/  # o coração Sonic: personagem, câmera, anéis, molas, meta, HUD
 packages/kit-inimigos/  # patrulheiro agora; perseguidor, atirador e voador depois
-packages/blocos/        # a árvore única: blocos, código, conferidor e interpretador
-packages/autoria/       # documento de cena, formato .cena, peças, desfazer, montador
+packages/kit-brinquedos/  # física-brinquedo: a porta agora; alavancas e esteiras depois
+packages/blocos/        # a árvore única: blocos, código, regras, conferidor e interpretador
+packages/autoria/       # documento de cena, formato .cena, peças, desfazer, montador, perfis
 apps/editor/            # o editor: viewport, árvore, inspetor, peças, teste ao vivo
 apps/playground/        # a cena de referência que mede a máquina
 docs/PLANO.md           # o contrato do projeto

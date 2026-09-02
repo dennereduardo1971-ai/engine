@@ -15,7 +15,16 @@ import { type Expressao } from './arvore.ts';
  * problema de lugar.
  */
 
-export type TipoDeValor = 'numero' | 'texto' | 'booleano' | 'qualquer';
+/**
+ * O tipo de um buraco de bloco.
+ *
+ * `peca` e `som` sao texto por baixo — o interpretador e o conferidor nem
+ * sabem que eles existem. Eles moram aqui porque a *interface* precisa saber:
+ * um buraco de peca vira uma lista das pecas da fase, e um de som vira a
+ * lista dos sons que a engine tem. E o que faz o perfil Design da secao 8 ser
+ * possivel sem digitar nada — ninguem escreve "Porta" de cabeca e acerta.
+ */
+export type TipoDeValor = 'numero' | 'texto' | 'booleano' | 'peca' | 'som' | 'qualquer';
 
 export interface Parametro {
   nome: string;
@@ -25,7 +34,7 @@ export interface Parametro {
   padrao: Expressao;
 }
 
-export type Categoria = 'movimento' | 'jogo' | 'valores' | 'controle';
+export type Categoria = 'movimento' | 'cena' | 'jogo' | 'valores' | 'controle';
 
 export interface BlocoDefinicao {
   /** Nome chamado no codigo. */
@@ -68,10 +77,23 @@ export const EVENTOS: readonly EventoDefinicao[] = [
     ajuda: 'Roda o tempo todo, sessenta vezes por segundo. Cuidado com o que você põe aqui.',
   },
   {
+    // O nome no codigo continua "AoEncostar", e a forma lida virou "chegar
+    // aqui". A secao 7 do plano escreve a regra-modelo como "quando o jogador
+    // entra aqui", e "aqui" e a palavra certa: ela serve tanto para um bloco
+    // quanto para uma Area, que e uma regiao inteira do mapa. Trocar o nome no
+    // codigo junto quebraria toda cena ja salva, e sem ganho nenhum.
     nome: 'AoEncostar',
-    forma: 'quando o jogador encostar em mim',
+    forma: 'quando o jogador chegar aqui',
     parametro: 'jogador',
-    ajuda: 'Roda quando o personagem chega perto desta peça.',
+    ajuda: 'Roda quando o personagem entra no espaço desta peça.',
+  },
+  {
+    nome: 'AoSair',
+    forma: 'quando o jogador sair daqui',
+    parametro: 'jogador',
+    ajuda:
+      'Roda quando o personagem se afasta desta peça. É o par de "chegar aqui": ' +
+      'com os dois, uma porta abre na entrada e fecha na saída.',
   },
 ];
 
@@ -117,6 +139,44 @@ export const BLOCOS: readonly BlocoDefinicao[] = [
     devolve: null,
     ajuda: 'Dá um impulso no personagem, como uma mola.',
   },
+  // --- Cena -----------------------------------------------------------------
+  //
+  // Os unicos blocos que falam de *outra* peca. Todo o resto age em quem tem o
+  // script — e essa distincao e proposital: "abrir a porta la longe" e uma
+  // ideia bem mais dificil do que "sumir", e merece um lugar separado na
+  // gaveta, e nao ficar misturada com o que age em mim.
+  {
+    nome: 'abrir',
+    forma: 'abrir {peca}',
+    categoria: 'cena',
+    parametros: [{ nome: 'peca', rotulo: '', tipo: 'peca', padrao: texto('') }],
+    devolve: null,
+    ajuda: 'Uma porta desce e libera a passagem.',
+  },
+  {
+    nome: 'fechar',
+    forma: 'fechar {peca}',
+    categoria: 'cena',
+    parametros: [{ nome: 'peca', rotulo: '', tipo: 'peca', padrao: texto('') }],
+    devolve: null,
+    ajuda: 'A porta sobe de volta e barra a passagem.',
+  },
+  {
+    nome: 'esconderPeca',
+    forma: 'esconder {peca}',
+    categoria: 'cena',
+    parametros: [{ nome: 'peca', rotulo: '', tipo: 'peca', padrao: texto('') }],
+    devolve: null,
+    ajuda: 'Some com outra peça da fase, e tira ela do caminho.',
+  },
+  {
+    nome: 'mostrarPeca',
+    forma: 'mostrar {peca}',
+    categoria: 'cena',
+    parametros: [{ nome: 'peca', rotulo: '', tipo: 'peca', padrao: texto('') }],
+    devolve: null,
+    ajuda: 'Traz de volta uma peça que estava escondida.',
+  },
   // --- Jogo -----------------------------------------------------------------
   {
     nome: 'darAneis',
@@ -157,6 +217,14 @@ export const BLOCOS: readonly BlocoDefinicao[] = [
     parametros: [],
     devolve: null,
     ajuda: 'Aparece de novo.',
+  },
+  {
+    nome: 'tocarSom',
+    forma: 'tocar som {som}',
+    categoria: 'jogo',
+    parametros: [{ nome: 'som', rotulo: '', tipo: 'som', padrao: texto('porta') }],
+    devolve: null,
+    ajuda: 'Toca um dos sons da engine.',
   },
   {
     nome: 'dizer',

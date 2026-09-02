@@ -84,5 +84,14 @@ export {
 
 export { MemoryStorage, SaveSlot, type SaveOptions } from './save/save.ts';
 
+export {
+  existeSom,
+  silenciar,
+  SONS,
+  tocarSom,
+  volumeDosSons,
+  type NomeDeSom,
+} from './audio/sons.ts';
+
 export { Engine, type EngineOptions } from './engine.ts';
 export { PerfHud } from './debug/perf-hud.ts';

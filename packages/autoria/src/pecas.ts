@@ -69,6 +69,14 @@ export interface Piece {
   components: Record<string, Record<string, number>>;
   /** So pode existir uma na fase (o ponto de partida). */
   unique?: boolean;
+  /**
+   * Peca de marcacao: aparece so no editor, e some quando o jogo roda.
+   *
+   * A Area e o caso: ela e o "aqui" de *"quando o jogador entra aqui"*, e o
+   * "aqui" e um lugar, e nao um objeto. Quem monta a fase precisa ver onde ele
+   * fica; quem joga nao pode ver caixa nenhuma flutuando na pista.
+   */
+  soNoEditor?: boolean;
 }
 
 /**
@@ -170,6 +178,35 @@ export const PIECES: readonly Piece[] = [
     instanced: true,
     solid: true,
     dropY: 0,
+    components: {},
+  },
+  {
+    id: 'porta',
+    label: 'Porta',
+    icon: '🚪',
+    group: 'jogo',
+    hint: 'Barra a passagem até uma regra mandar abrir. Ao abrir, ela desce e some no chão.',
+    mesh: { kind: 'caixa', size: [8, 5, 0.8] },
+    color: 0x8a6a3f,
+    instanced: false,
+    solid: true,
+    dropY: 0,
+    // O percurso e um pouco maior que a altura: assim a porta aberta some
+    // inteira no chao, em vez de deixar uma faixa de madeira aparecendo.
+    components: { Porta: { travel: 5.4, speed: 9 } },
+  },
+  {
+    id: 'area',
+    label: 'Área',
+    icon: '🟦',
+    group: 'jogo',
+    hint: 'Uma região invisível. É o "aqui" de "quando o jogador chegar aqui".',
+    mesh: { kind: 'caixa', size: [8, 6, 4] },
+    color: 0x4f9dff,
+    instanced: false,
+    solid: false,
+    dropY: 0,
+    soNoEditor: true,
     components: {},
   },
   {

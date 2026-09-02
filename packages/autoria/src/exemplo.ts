@@ -112,6 +112,37 @@ export function faseDeExemplo(): SceneData {
   // suspenso sem passar pela rampa.
   no('mola', 'Mola de atalho', { x: 3, y: 0.5, z: 12 }, jogo.id);
 
+  // --- A regra-modelo da secao 7 -------------------------------------------
+  //
+  // *"Quando o jogador entra aqui → abre a porta e toca som."* E a frase que o
+  // plano usa para explicar o que uma regra e, e ela esta aqui montada, no pe
+  // da rampa: uma porta barrando a subida e uma area quatro unidades antes
+  // dela.
+  //
+  // Ela e escrita aqui como codigo, e nao montada como arvore, pelo mesmo
+  // motivo do Bloco Secreto: e assim que a familia escreve. E, no editor, ela
+  // aparece como *regra* no perfil Design, como bloco no Criador e como este
+  // mesmo texto no Programador — sem conversao no meio, porque e a mesma
+  // arvore vista de tres jeitos.
+  //
+  // A porta nao fecha de volta: o "sair daqui" existe, mas fechar a porta na
+  // saida da area fecharia ela na cara de quem acabou de passar.
+  no('porta', 'Porta', { y: 0.5, z: 15.5 }, jogo.id);
+  no(
+    'area',
+    'Entrada da rampa',
+    { y: 0.5, z: 11.5 },
+    jogo.id,
+    {},
+    comScript(`
+on(AoEncostar, (jogador) => {
+  abrir("Porta");
+  tocarSom("porta");
+  dizer("A porta abriu!");
+});
+`),
+  );
+
   // A meta, em cima da plataforma solta do fim: chegar la exige o pulo.
   no('meta', 'Meta', { x: 22, y: 2.5, z: 50 }, jogo.id);
 

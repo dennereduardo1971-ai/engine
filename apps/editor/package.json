@@ -13,6 +13,7 @@
   "dependencies": {
     "@faisca/autoria": "*",
     "@faisca/blocos": "*",
+    "@faisca/kit-brinquedos": "*",
     "@faisca/kit-velocidade": "*",
     "@faisca/runtime": "*",
     "react": "^19.2.0",

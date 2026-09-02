@@ -4,6 +4,7 @@ import { Arvore } from './ui/Arvore.tsx';
 import { Barra } from './ui/Barra.tsx';
 import { Inspetor } from './ui/Inspetor.tsx';
 import { Pecas } from './ui/Pecas.tsx';
+import { Pista } from './ui/Pista.tsx';
 import { Programar } from './ui/Programar.tsx';
 
 /**
@@ -61,6 +62,7 @@ export function App() {
         <aside className="lado esquerda">
           {editor ? (
             <>
+              <Pista editor={editor} />
               <Pecas editor={editor} />
               <Arvore editor={editor} />
             </>

@@ -276,7 +276,16 @@ Entrega em fatias. Cada fatia é um pull request, e termina com **algo que você
 > de malha no Rapier, do jeito que ela é desenhada, e o que se vê é o que se colide.
 
 ### Mês 2 — Autoria de verdade
-M5 ✅ blocos ⇄ código · M6 ✅ gatilho-e-resposta e perfil Design · M7 spline de pista · M8 importação de assets e kit inicial
+M5 ✅ blocos ⇄ código · M6 ✅ gatilho-e-resposta e perfil Design · M7 ✅ spline de pista · M8 importação de assets e kit inicial
+
+> **Sobre a M7.** A pista sai de uma curva Catmull-Rom desenhada clicando no
+> viewport (ferramenta **Pista**): cada ponto guarda posição, largura e
+> inclinação, e o montador gera a fita e o colisor de malha dela do mesmo
+> jeito que já gerava para as peças modulares — nenhuma peca do controlador
+> de movimento mudou, porque ele já seguia a normal de qualquer colisor. O
+> loop vertical de verdade (a curva virando de cabeça para baixo) e o ajuste
+> de largura/inclinação por ponto ficam de fora desta fatia: entram depois,
+> em cima do mesmo formato de dados.
 
 > **Sobre a M6.** As regras não são um formato: são a **terceira visão da mesma
 > árvore** da seção 7. Uma regra é um bloco `quando` com uma pilha de ações

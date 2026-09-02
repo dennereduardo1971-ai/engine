@@ -29,14 +29,21 @@ import {
   type ErroDeExecucao,
   type Valor,
 } from '@faisca/blocos';
-import { type SceneChange, type SceneDocument, type SceneNode } from './documento.ts';
+import {
+  type SceneChange,
+  type SceneDocument,
+  type SceneNode,
+  type SplineData,
+} from './documento.ts';
 import {
   type Piece,
   pieceBounds,
   pieceGeometry,
   pieceOrPlaceholder,
   scaledTrimesh,
+  type TrimeshData,
 } from './pecas.ts';
+import { buildSplineGeometry, type SplineMesh } from './spline.ts';
 import { worldPlacement, yawQuaternion } from './transformacoes.ts';
 
 /**
@@ -146,6 +153,13 @@ export class SceneAssembler {
   private readonly batches = new Map<string, InstancedBatch>();
   private readonly materials = new Map<string, THREE.Material>();
   private unsubscribe: (() => void) | null = null;
+  /**
+   * Malha de cada pista desenhada, uma por no e nao por peca: ao contrario
+   * das pecas modulares, cada spline e unica, entao o cache do `pecas.ts`
+   * (por `piece.id`) nao serve aqui. Guarda tambem os dados que a geraram,
+   * para saber se precisa refazer.
+   */
+  private readonly splineCache = new Map<string, { data: SplineData; mesh: SplineMesh }>();
 
   /** Personagem do teste ao vivo, ou -1 fora do teste. */
   hero: Entity = -1;
@@ -664,6 +678,14 @@ export class SceneAssembler {
       case 'fields':
         this.applyFields(change.id, change.component);
         break;
+      case 'spline': {
+        // Malha e colisor dependem dos pontos: refazer os dois, igual a
+        // 'appearance'.
+        const node = this.document.get(change.id);
+        this.destroy(change.id);
+        if (node) this.create(node);
+        break;
+      }
       case 'appearance': {
         // Cor e visibilidade mexem no material e na vaga do lote: refazer o
         // objeto e mais simples (e igualmente rapido) do que remendar os dois.
@@ -698,7 +720,8 @@ export class SceneAssembler {
         const batch = this.batchFor(piece);
         if (batch.claim(entity) >= 0) built.batch = batch;
       } else {
-        const objeto = new THREE.Mesh(pieceGeometry(piece), this.materialFor(piece, node.color));
+        const geometria = this.splineMeshFor(node)?.geometry ?? pieceGeometry(piece);
+        const objeto = new THREE.Mesh(geometria, this.materialFor(piece, node.color));
         objeto.userData.faiscaNode = node.id;
         this.host.attach(entity, objeto);
         built.object = objeto;
@@ -742,6 +765,20 @@ export class SceneAssembler {
     this.host.world.destroy(built.entity);
     this.byEntity.delete(built.entity);
     this.built.delete(nodeId);
+    this.splineCache.delete(nodeId);
+  }
+
+  /** A malha da pista desenhada deste no, ou `null` para uma peca comum. */
+  private splineMeshFor(node: SceneNode): SplineMesh | null {
+    const data = node.spline;
+    if (!data || data.pontos.length < 2) return null;
+    const cached = this.splineCache.get(node.id);
+    // Mesma referencia de dados: setSpline sempre clona, entao uma referencia
+    // igual so acontece quando nada mudou desde a ultima vez.
+    if (cached && cached.data === data) return cached.mesh;
+    const mesh = buildSplineGeometry(data.pontos, data.fechada);
+    this.splineCache.set(node.id, { data, mesh });
+    return mesh;
   }
 
   /** Escreve a posicao de mundo do no no Transform da entidade. */
@@ -788,7 +825,9 @@ export class SceneAssembler {
     if (!physics || !node.visible) return;
 
     const place = worldPlacement(this.document, node);
-    const malha = scaledTrimesh(built.piece, place.sx, place.sy, place.sz);
+    const malha: TrimeshData | null =
+      this.splineMeshFor(node)?.trimesh ??
+      scaledTrimesh(built.piece, place.sx, place.sy, place.sz);
     if (!malha) return;
 
     built.collider = physics.addTrimesh(malha.vertices, malha.indices, {

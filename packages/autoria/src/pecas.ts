@@ -4,9 +4,9 @@ import * as THREE from 'three';
  * Pecas modulares — o jeito de montar uma fase sem programar nada.
  *
  * A secao 9 do plano lista tres ferramentas de construcao de fase: spline de
- * pista, pecas modulares numa grade e terreno esculpivel. A spline e a M7; o
- * terreno vem depois. As pecas sao o que da para entregar agora, e sao o
- * suficiente para a promessa da M3: montar uma pista e testar na hora.
+ * pista (a M7, em `spline.ts`), pecas modulares numa grade e terreno
+ * esculpivel — o terreno vem depois. As pecas modulares bastam para a
+ * promessa da M3: montar uma pista e testar na hora.
  *
  * Uma peca e so uma descricao: qual malha, que cor, se ela e pisavel e que
  * componentes ela leva. Quem transforma isso em entidade e objeto do Three.js
@@ -23,7 +23,14 @@ export type MeshKind =
   | 'cone'
   | 'marco'
   | 'mola'
-  | 'inimigo';
+  | 'inimigo'
+  /**
+   * Pista desenhada (secao 9: spline de pista, a M7). A geometria de
+   * `buildGeometry` abaixo e so um marcador vazio — a malha de verdade sai
+   * de `node.spline` a cada no, no montador, porque cada pista desenhada e
+   * unica (o cache por `piece.id` deste arquivo assume uma malha por tipo).
+   */
+  | 'spline';
 
 export interface MeshSpec {
   kind: MeshKind;
@@ -242,6 +249,20 @@ export const PIECES: readonly Piece[] = [
     components: {},
   },
   {
+    id: 'pista-spline',
+    label: 'Pista',
+    icon: '🛣️',
+    group: 'pista',
+    hint: 'Desenhe clicando: cada clique poe um ponto, e a linha vira estrada.',
+    // Placeholder: a malha de verdade vem de `node.spline` (ver MeshKind).
+    mesh: { kind: 'spline', size: [0, 0, 0] },
+    color: 0x3f4c70,
+    instanced: false,
+    solid: true,
+    dropY: 0,
+    components: {},
+  },
+  {
     id: 'mola',
     label: 'Mola',
     icon: '🔺',
@@ -343,6 +364,9 @@ function buildGeometry(mesh: MeshSpec): THREE.BufferGeometry {
   switch (mesh.kind) {
     case 'grupo':
       // Um grupo nao desenha nada: ele so segura os filhos na arvore.
+      return new THREE.BufferGeometry();
+    case 'spline':
+      // Marcador vazio — o montador troca por `buildSplineGeometry(node.spline)`.
       return new THREE.BufferGeometry();
     case 'caixa': {
       const geometry = new THREE.BoxGeometry(w, h, d);
@@ -494,7 +518,9 @@ const trimeshCache = new Map<string, TrimeshData>();
  * move.
  */
 export function pieceTrimesh(piece: Piece): TrimeshData | null {
-  if (!piece.solid || piece.mesh.kind === 'grupo') return null;
+  // Grupo nao tem malha, e spline tem a malha dela mesma no montador — nao no
+  // cache por tipo desta funcao (ver MeshKind).
+  if (!piece.solid || piece.mesh.kind === 'grupo' || piece.mesh.kind === 'spline') return null;
   const cached = trimeshCache.get(piece.id);
   if (cached) return cached;
 

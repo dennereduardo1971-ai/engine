@@ -297,6 +297,19 @@ button.link {
   color: var(--apagado);
 }
 
+/* --- Pista (spline) -------------------------------------------------------- */
+
+.pista-botoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.pista-botoes button {
+  flex: 1;
+}
+
 /* --- Arvore --------------------------------------------------------------- */
 
 .arvore .lista {

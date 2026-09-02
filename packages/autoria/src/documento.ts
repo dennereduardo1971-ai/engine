@@ -15,6 +15,7 @@
  */
 
 import { type Script } from '@faisca/blocos';
+import { type SplinePoint } from './spline.ts';
 
 /** Onde o no esta, para onde aponta e o tamanho dele. */
 export interface NodeTransform {
@@ -34,6 +35,19 @@ export interface NodeTransform {
   sz: number;
 }
 
+/**
+ * Os pontos de uma pista desenhada (secao 9: spline de pista, a M7).
+ *
+ * Um no com `spline` guarda os pontos em coordenadas de mundo — a pista e
+ * desenhada clicando no viewport, e nao ha "pai" para compor, entao o
+ * `transform` do no fica na identidade e e ignorado ao montar.
+ */
+export interface SplineData {
+  pontos: SplinePoint[];
+  /** Fecha a pista num laco, ligando o ultimo ponto ao primeiro. */
+  fechada: boolean;
+}
+
 /** Um no da arvore: uma peca colocada na fase. */
 export interface SceneNode {
   readonly id: string;
@@ -43,6 +57,8 @@ export interface SceneNode {
   piece: string;
   parent: string | null;
   transform: NodeTransform;
+  /** Presente so nos nos de pista desenhada (secao 9: spline de pista). */
+  spline?: SplineData | null;
   /**
    * Valores editados dos componentes, por nome de componente no codigo:
    * `{ SpeedCharacter: { maxSpeed: 30 } }`. So o que foi mexido mora aqui; o
@@ -78,6 +94,7 @@ export type SceneChange =
   | { kind: 'add'; id: string }
   | { kind: 'remove'; id: string }
   | { kind: 'transform'; id: string }
+  | { kind: 'spline'; id: string }
   | { kind: 'fields'; id: string; component: string }
   | { kind: 'appearance'; id: string }
   | { kind: 'name'; id: string }
@@ -103,6 +120,7 @@ export interface AddOptions {
   /** Id fixo, usado ao carregar um arquivo. Sem isto, um id novo e gerado. */
   id?: string;
   script?: Script | null;
+  spline?: SplineData | null;
 }
 
 export class SceneDocument {
@@ -172,6 +190,7 @@ export class SceneDocument {
       color: options.color ?? null,
       visible: options.visible ?? true,
       script: options.script ?? null,
+      spline: options.spline ? cloneSpline(options.spline) : null,
     };
     this.byId.set(id, node);
     this.order.push(id);
@@ -227,6 +246,20 @@ export class SceneDocument {
     if (!node) return;
     node.script = script ? structuredClone(script) : null;
     this.emit({ kind: 'script', id });
+  }
+
+  /**
+   * Troca os pontos de uma pista desenhada.
+   *
+   * Igual ao script (setScript): entra por copia, para o rascunho de quem
+   * ainda esta desenhando no viewport nunca ser o mesmo array que o
+   * documento guarda.
+   */
+  setSpline(id: string, data: SplineData | null): void {
+    const node = this.byId.get(id);
+    if (!node) return;
+    node.spline = data ? cloneSpline(data) : null;
+    this.emit({ kind: 'spline', id });
   }
 
   setField(id: string, component: string, field: string, value: number): void {
@@ -303,6 +336,7 @@ export class SceneDocument {
         color: node.color,
         visible: node.visible,
         script: node.script,
+        spline: node.spline,
       });
       remap.set(node.id, copy.id);
       first ??= copy;
@@ -331,6 +365,7 @@ export class SceneDocument {
         ...node,
         transform: { ...node.transform },
         fields: cloneFields(node.fields),
+        spline: node.spline ? cloneSpline(node.spline) : null,
       })),
     };
   }
@@ -352,6 +387,7 @@ export class SceneDocument {
         color: node.color ?? null,
         visible: node.visible !== false,
         script: node.script ?? null,
+        spline: node.spline ? cloneSpline(node.spline) : null,
       };
       this.byId.set(copy.id, copy);
       this.order.push(copy.id);
@@ -383,7 +419,11 @@ export class SceneDocument {
 }
 
 /** Versao do formato gravada no arquivo. */
-export const FORMAT_VERSION = '0.1';
+export const FORMAT_VERSION = '0.2';
+
+function cloneSpline(data: SplineData): SplineData {
+  return { pontos: data.pontos.map((ponto) => ({ ...ponto })), fechada: data.fechada };
+}
 
 function cloneFields(
   fields: Record<string, Record<string, number>>,

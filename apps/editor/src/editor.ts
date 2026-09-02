@@ -29,6 +29,7 @@ import {
   SceneAssembler,
   SceneDocument,
   type SceneNode,
+  type SplinePoint,
   worldPlacement,
   writeScene,
 } from '@faisca/autoria';
@@ -70,6 +71,12 @@ export class Editor {
   selection: string | null = null;
   /** Peca escolhida no painel: com ela na mao, clicar no chao coloca uma. */
   brush: string | null = null;
+  /**
+   * A pista sendo desenhada agora, ou `null` fora do modo Pista (secao 9: a
+   * ferramenta 1, a M7). Cada clique no chao poe um ponto aqui; Concluir
+   * transforma isso num no de verdade.
+   */
+  splineDraft: SplinePoint[] | null = null;
   grid = 2;
   snap = true;
   /** Altura em que as pecas novas caem. */
@@ -119,9 +126,13 @@ export class Editor {
       get workHeight() {
         return editor.workHeight;
       },
+      get splineDrafting() {
+        return editor.splineDraft !== null;
+      },
       select: (id) => this.select(id),
       place: (x, y, z) => this.placePiece(x, y, z),
       moveSelection: (x, z, fase) => this.dragSelection(x, z, fase),
+      addSplinePoint: (x, y, z) => this.addSplinePoint(x, y, z),
     });
 
     // Os sistemas do jogo ficam registrados o tempo todo. Fora do teste nao
@@ -282,6 +293,79 @@ export class Editor {
       transform: { ...local },
     });
     this.select(no.id);
+  }
+
+  // --- Pista desenhada (spline, a M7) ----------------------------------------
+
+  /** Larguras/inclinacoes de fabrica de um ponto novo. */
+  private static readonly LARGURA_PADRAO = 6;
+  private static readonly INCLINACAO_PADRAO = 0;
+
+  /** Comeca um rascunho de pista. Guarda o pincel: os dois nao convivem. */
+  beginSpline(): void {
+    this.brush = null;
+    this.select(null);
+    this.splineDraft = [];
+    this.notify();
+  }
+
+  /** Poe um ponto no rascunho. So funciona com um rascunho aberto. */
+  addSplinePoint(x: number, y: number, z: number): void {
+    if (!this.splineDraft) return;
+    this.splineDraft = [
+      ...this.splineDraft,
+      {
+        x: this.encaixar(x),
+        y,
+        z: this.encaixar(z),
+        largura: Editor.LARGURA_PADRAO,
+        inclinacao: Editor.INCLINACAO_PADRAO,
+      },
+    ];
+    this.viewport.previewSpline(this.splineDraft);
+    this.notify();
+  }
+
+  /** Tira o ultimo ponto do rascunho — util quando o clique escapou do lugar. */
+  undoSplinePoint(): void {
+    if (!this.splineDraft || this.splineDraft.length === 0) return;
+    this.splineDraft = this.splineDraft.slice(0, -1);
+    this.viewport.previewSpline(this.splineDraft);
+    this.notify();
+  }
+
+  /** Transforma o rascunho num no de verdade. */
+  finishSpline(): void {
+    const pontos = this.splineDraft;
+    if (!pontos) return;
+    if (pontos.length < 2) {
+      this.aviso('Uma pista precisa de pelo menos 2 pontos. Clique mais uma vez, ou cancele.');
+      return;
+    }
+    this.history.record('desenhar pista');
+    const no = this.document.add('pista-spline', {
+      name: this.nomeLivre('Pista'),
+      parent: this.grupoPara('pista'),
+      spline: { pontos, fechada: false },
+    });
+    this.splineDraft = null;
+    this.viewport.previewSpline(null);
+    this.select(no.id);
+  }
+
+  /** Larga o rascunho sem criar nada. */
+  cancelSpline(): void {
+    this.splineDraft = null;
+    this.viewport.previewSpline(null);
+    this.notify();
+  }
+
+  /** Fecha ou abre o laco da pista selecionada. */
+  setSplineFechada(fechada: boolean): void {
+    const node = this.selectedNode;
+    if (!node?.spline) return;
+    this.history.record(fechada ? 'fechar pista' : 'abrir pista');
+    this.document.setSpline(node.id, { ...node.spline, fechada });
   }
 
   /** Arrasto no viewport: um passo de desfazer para o arrasto inteiro. */

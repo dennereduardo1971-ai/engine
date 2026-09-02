@@ -7,7 +7,9 @@ import { Numero, pararTeclas } from './campos.tsx';
  *
  * Escolher uma peca e clicar no chao coloca uma. E a ferramenta 2 da secao 9
  * do plano — pecas modulares que encaixam numa grade, com giro em angulos
- * fixos. A spline de pista, que e a ferramenta 1, e a M7.
+ * fixos. A spline de pista, a ferramenta 1 (a M7), tem o botao dela em
+ * `Pista.tsx` — a "peca" de catalogo `pista-spline` existe so para o
+ * montador saber o que desenhar, e nao aparece nesta grade.
  */
 const GRUPOS: { id: Piece['group']; titulo: string }[] = [
   { id: 'jogo', titulo: 'Jogo' },
@@ -26,7 +28,9 @@ export function Pecas({ editor }: { editor: Editor }) {
         <div key={grupo.id} className="grupo-de-pecas">
           <h3>{grupo.titulo}</h3>
           <div className="grade-de-pecas">
-            {PIECES.filter((piece) => piece.group === grupo.id).map((piece) => (
+            {PIECES.filter(
+              (piece) => piece.group === grupo.id && piece.mesh.kind !== 'spline',
+            ).map((piece) => (
               <button
                 key={piece.id}
                 type="button"

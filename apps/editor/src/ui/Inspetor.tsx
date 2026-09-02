@@ -84,7 +84,7 @@ export function Inspetor({ editor }: { editor: Editor }) {
         </label>
       </div>
 
-      <Transformar editor={editor} node={node} />
+      {node.spline ? <PistaInfo editor={editor} node={node} /> : <Transformar editor={editor} node={node} />}
 
       {componentes.length === 0 ? null : (
         <div className="bloco">
@@ -123,6 +123,33 @@ export function Inspetor({ editor }: { editor: Editor }) {
         </button>
       </div>
     </section>
+  );
+}
+
+/**
+ * A pista desenhada nao tem "Transformar": os pontos ja sao coordenadas do
+ * mundo, e o transform do no fica de fora (secao 9: spline de pista, a M7).
+ * Largura e inclinacao por ponto ficam para uma fatia futura — por enquanto
+ * so o laco fechado se mexe daqui.
+ */
+function PistaInfo({ editor, node }: { editor: Editor; node: SceneNode }) {
+  const spline = node.spline;
+  if (!spline) return null;
+  return (
+    <div className="bloco">
+      <h3>Pista</h3>
+      <p className="vazio">
+        {spline.pontos.length} ponto{spline.pontos.length > 1 ? 's' : ''}.
+      </p>
+      <label className="campo">
+        <span className="rotulo">Laço fechado</span>
+        <input
+          type="checkbox"
+          checked={spline.fechada}
+          onChange={(event) => editor.setSplineFechada(event.target.checked)}
+        />
+      </label>
+    </div>
   );
 }
 

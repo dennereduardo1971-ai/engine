@@ -20,7 +20,15 @@ export {
   type SceneData,
   type SceneListener,
   type SceneNode,
+  type SplineData,
 } from './documento.ts';
+
+export {
+  buildSplineGeometry,
+  type SplineMesh,
+  type SplinePoint,
+  type SplineTrimesh,
+} from './spline.ts';
 
 export { readScene, writeScene } from './formato.ts';
 

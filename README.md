@@ -93,8 +93,16 @@ mesmo projeto; muda só o que aparece na tela:
 Trocar de perfil no meio do trabalho não mexe na fase: a peça programada com blocos
 continua programada quando alguém abre o projeto no Design — ela só não mostra os blocos.
 
-Próxima fatia: **M7** — a spline de pista: desenhar uma linha no espaço e ela virar
-estrada, com largura, inclinação e loops, e colisão gerada sozinha.
+### Desenhar uma pista
+
+A **M7** chegou: o botão **Pista**, no painel esquerdo, arma o desenho — cada clique
+no chão põe um ponto, e uma linha verde mostra o rascunho na hora. **Concluir** vira uma
+peça de verdade, com largura e colisão de malha geradas sozinhas a partir da curva; **Desfazer
+ponto** tira o último clique, e **Cancelar** larga o rascunho sem criar nada. O inspetor da
+pista tem um laço **fechado**, que liga o último ponto ao primeiro.
+
+Inclinação (banking) por ponto e loop vertical de verdade ainda não têm um jeito de ajustar
+no editor — chegam numa fatia seguinte. Por enquanto toda pista nasce plana.
 
 ### O que é guardado, e onde
 

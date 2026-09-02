@@ -252,6 +252,37 @@ describe('colisor das pecas', () => {
     doc.remove(no.id);
     expect(alturaEm(0, 0)).toBe(null);
   });
+
+  it('a pista desenhada (spline) vira chao no lugar que ela desenha', () => {
+    const no = doc.add('pista-spline', {
+      name: 'Pista',
+      spline: {
+        pontos: [
+          { x: 0, y: 0, z: 0, largura: 8, inclinacao: 0 },
+          { x: 0, y: 0, z: 20, largura: 8, inclinacao: 0 },
+        ],
+        fechada: false,
+      },
+    });
+    montador.build();
+
+    expect(alturaEm(0, 10)).toBeCloseTo(0, 3);
+    expect(alturaEm(20, 10)).toBe(null); // fora da largura da fita
+
+    // Trocar os pontos refaz a malha e o colisor no lugar novo, sem remontar
+    // a fase — o mesmo hot reload que ja vale para as pecas modulares.
+    doc.setSpline(no.id, {
+      pontos: [
+        { x: 0, y: 5, z: 0, largura: 8, inclinacao: 0 },
+        { x: 0, y: 5, z: 20, largura: 8, inclinacao: 0 },
+      ],
+      fechada: false,
+    });
+    expect(alturaEm(0, 10)).toBeCloseTo(5, 3);
+
+    doc.remove(no.id);
+    expect(alturaEm(0, 10)).toBe(null);
+  });
 });
 
 describe('a peça vira comportamento', () => {

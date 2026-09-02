@@ -29,10 +29,14 @@ export interface ViewportActions {
   readonly brush: string | null;
   /** Altura em que as pecas novas sao colocadas. */
   readonly workHeight: number;
+  /** Ha um rascunho de pista (spline) aberto — clique poe ponto, e nao peca. */
+  readonly splineDrafting: boolean;
   select(nodeId: string | null): void;
   place(x: number, y: number, z: number): void;
   /** Arrasto da selecao no plano do chao. */
   moveSelection(x: number, z: number, phase: 'inicio' | 'meio' | 'fim'): void;
+  /** Poe um ponto no rascunho de pista, no plano do chao onde o mouse clicou. */
+  addSplinePoint(x: number, y: number, z: number): void;
 }
 
 /** Distancia em pixels antes de um clique virar arrasto. */
@@ -48,6 +52,8 @@ export class Viewport {
   private readonly plano = new THREE.Plane();
   private readonly ponto = new THREE.Vector3();
   private readonly contorno: THREE.LineSegments;
+  /** A linha do rascunho de pista, enquanto ela ainda nao e um no de verdade. */
+  private readonly rascunhoDePista: THREE.Line;
   private readonly listeners: [string, EventListener][] = [];
   private readonly cameraGuardada = { position: new THREE.Vector3(), target: new THREE.Vector3() };
 
@@ -111,6 +117,14 @@ export class Viewport {
     this.contorno.visible = false;
     this.contorno.matrixAutoUpdate = true;
     engine.scene.add(this.contorno);
+
+    this.rascunhoDePista = new THREE.Line(
+      new THREE.BufferGeometry(),
+      new THREE.LineBasicMaterial({ color: 0x4ade80, depthTest: false }),
+    );
+    this.rascunhoDePista.renderOrder = 999;
+    this.rascunhoDePista.visible = false;
+    engine.scene.add(this.rascunhoDePista);
 
     this.on(canvas, 'pointerdown', (event) => this.onPointerDown(event as PointerEvent));
     this.on(canvas, 'pointermove', (event) => this.onPointerMove(event as PointerEvent));
@@ -180,11 +194,28 @@ export class Viewport {
     this.contorno.visible = true;
   }
 
+  /** Desenha (ou apaga, com `null`) a linha do rascunho de pista. */
+  previewSpline(pontos: readonly { x: number; y: number; z: number }[] | null): void {
+    if (!pontos || pontos.length < 2) {
+      this.rascunhoDePista.visible = false;
+      return;
+    }
+    const posicoes = new Float32Array(pontos.length * 3);
+    pontos.forEach((p, i) => posicoes.set([p.x, p.y + 0.05, p.z], i * 3));
+    this.rascunhoDePista.geometry.dispose();
+    this.rascunhoDePista.geometry = new THREE.BufferGeometry().setAttribute(
+      'position',
+      new THREE.Float32BufferAttribute(posicoes, 3),
+    );
+    this.rascunhoDePista.visible = true;
+  }
+
   dispose(): void {
     const canvas = this.engine.renderer.canvas;
     for (const [type, listener] of this.listeners) canvas.removeEventListener(type, listener);
     this.listeners.length = 0;
     this.controls.dispose();
+    this.rascunhoDePista.geometry.dispose();
   }
 
   // --- Mouse ----------------------------------------------------------------
@@ -200,6 +231,14 @@ export class Viewport {
     }
     this.inicioX = event.clientX;
     this.inicioY = event.clientY;
+
+    // Com um rascunho de pista aberto, o clique poe um ponto — e nem
+    // seleciona, nem coloca peca.
+    if (this.actions.splineDrafting) {
+      const ponto = this.pontoNoPlano(event, this.actions.workHeight);
+      if (ponto) this.actions.addSplinePoint(ponto.x, this.actions.workHeight, ponto.z);
+      return;
+    }
 
     // Com o pincel na mao, o clique e uma peca nova, e nao uma selecao.
     if (this.actions.brush) {

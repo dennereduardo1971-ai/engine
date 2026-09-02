@@ -4,7 +4,9 @@ import {
   identityTransform,
   type SceneData,
   type SceneNode,
+  type SplineData,
 } from './documento.ts';
+import { type SplinePoint } from './spline.ts';
 
 /**
  * O formato `.cena` — a fase gravada como texto que uma pessoa consegue ler.
@@ -64,6 +66,7 @@ function writeNode(node: SceneNode): string {
   }
   if (node.color !== null) partes.push(`"cor": "${hex(node.color)}"`);
   if (!node.visible) partes.push('"oculto": true');
+  if (node.spline) partes.push(`"pista": ${writeSpline(node.spline)}`);
 
   const componentes = Object.entries(node.fields).filter(
     ([, values]) => Object.keys(values).length > 0,
@@ -88,6 +91,22 @@ function writeNode(node: SceneNode): string {
     partes.push(`"campos": { ${corpo} }`);
   }
 
+  return `{ ${partes.join(', ')} }`;
+}
+
+/**
+ * A pista, num par que cabe numa linha: um array por ponto
+ * (`[x, y, z, largura, inclinacao]`) e o booleano de laco fechado.
+ */
+function writeSpline(spline: SplineData): string {
+  const pontos = spline.pontos
+    .map(
+      (p) =>
+        `[${num(p.x)}, ${num(p.y)}, ${num(p.z)}, ${num(p.largura)}, ${num(p.inclinacao)}]`,
+    )
+    .join(', ');
+  const partes = [`"pontos": [${pontos}]`];
+  if (spline.fechada) partes.push('"fechada": true');
   return `{ ${partes.join(', ')} }`;
 }
 
@@ -146,12 +165,15 @@ function readNode(bruto: unknown, indice: number): SceneNode {
     sz: escala[2],
   };
 
-  // Peca sem script nao ganha a chave: o no que sai do arquivo fica igual ao
-  // no que entrou, e a ida e volta continua comparavel campo a campo.
+  // Peca sem script (ou sem pista) nao ganha a chave: o no que sai do
+  // arquivo fica igual ao no que entrou, e a ida e volta continua
+  // comparavel campo a campo.
   const script = readScript(no.script);
+  const spline = readSpline(no.pista);
 
   return {
     ...(script ? { script } : {}),
+    ...(spline ? { spline } : {}),
     id: typeof no.id === 'string' ? no.id : `n${indice + 1}`,
     name: typeof no.nome === 'string' ? no.nome : peca,
     piece: peca,
@@ -161,6 +183,28 @@ function readNode(bruto: unknown, indice: number): SceneNode {
     color: readColor(no.cor),
     visible: no.oculto !== true,
   };
+}
+
+/** Le a pista de volta. Sem "pontos" suficientes, o no vira uma peca comum. */
+function readSpline(bruto: unknown): SplineData | null {
+  if (!bruto || typeof bruto !== 'object') return null;
+  const dados = bruto as Record<string, unknown>;
+  if (!Array.isArray(dados.pontos)) return null;
+  const pontos: SplinePoint[] = [];
+  for (const item of dados.pontos) {
+    if (!Array.isArray(item) || item.length < 3) continue;
+    const [x, y, z, largura, inclinacao] = item;
+    if (![x, y, z].every((v) => typeof v === 'number' && Number.isFinite(v))) continue;
+    pontos.push({
+      x,
+      y,
+      z,
+      largura: typeof largura === 'number' && Number.isFinite(largura) ? largura : 6,
+      inclinacao: typeof inclinacao === 'number' && Number.isFinite(inclinacao) ? inclinacao : 0,
+    });
+  }
+  if (pontos.length < 2) return null;
+  return { pontos, fechada: dados.fechada === true };
 }
 
 /**

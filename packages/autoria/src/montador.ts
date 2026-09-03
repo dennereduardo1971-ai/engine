@@ -658,6 +658,21 @@ export class SceneAssembler {
     });
   }
 
+  /**
+   * Um botão da tela foi clicado: dispara `AoClicar` em todo script vivo.
+   *
+   * Vai para *todos* os scripts, e não para o dono de um botão — um botão de
+   * tela não é uma peça da cena, e não tem dono. Quem liga o clique aqui é
+   * quem tem a tela na mão (o editor, com o `UiRenderer` de
+   * `@faisca/interface`); o montador só sabe que alguém clicou num botão com
+   * este nome, e é o nome que o evento entrega para dentro da regra.
+   */
+  cliqueNaTela(nome: string): void {
+    for (const vivo of this.scripts) {
+      this.anotarErro(vivo, vivo.instancia.disparar('AoClicar', nome));
+    }
+  }
+
   // --- Reagir ao documento --------------------------------------------------
 
   private apply(change: SceneChange): void {

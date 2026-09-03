@@ -18,7 +18,17 @@ import {
 import { patrollerSystem } from '@faisca/kit-inimigos';
 import { portaSystem } from '@faisca/kit-brinquedos';
 import { type Script } from '@faisca/blocos';
-import { type Ancora, type UiNode, UiDocument } from '@faisca/interface';
+import {
+  aplicarTema,
+  CamposVivos,
+  findTema,
+  readInterface,
+  type Ancora,
+  type UiNode,
+  UiDocument,
+  UiRenderer,
+  writeInterface,
+} from '@faisca/interface';
 import {
   acharPerfil,
   faseDeExemplo,
@@ -55,7 +65,28 @@ import { Viewport } from './viewport.ts';
 export type EditorMode = 'editar' | 'jogar';
 
 const CHAVE_LOCAL = 'faisca:fase-01.cena';
+const CHAVE_TELA = 'faisca:fase-01.ui';
 const CHAVE_PERFIL = 'faisca:perfil';
+
+/**
+ * Os valores do jogo que um campo de tela pode acompanhar sozinho (M9).
+ *
+ * Todos saem normalizados de 0 a 1 porque o campo que quase sempre recebe
+ * isso é o `valor` de uma barra — "vida cheia" é 1, e não 3. Quem quiser o
+ * número cru continua podendo ligar a própria função em `CamposVivos`.
+ */
+export const FONTES_VIVAS = [
+  { id: 'vidas', label: 'Vidas' },
+  { id: 'aneis', label: 'Anéis' },
+  { id: 'tempo', label: 'Tempo' },
+  { id: 'velocidade', label: 'Velocidade' },
+] as const;
+
+export type FonteViva = (typeof FONTES_VIVAS)[number]['id'];
+
+export function fonteVivaValida(id: string): id is FonteViva {
+  return FONTES_VIVAS.some((fonte) => fonte.id === id);
+}
 
 export class Editor {
   readonly engine: Engine;
@@ -79,11 +110,16 @@ export class Editor {
    */
   readonly catalogo = new CatalogoDeAssets();
   /**
-   * A tela de interface sendo montada (M9, fatia 2). Uma só tela por
-   * projeto por enquanto — várias telas e o arquivo `.ui` no disco ficam
-   * para as próximas fatias.
+   * A tela de interface sendo montada (M9). Uma só tela por projeto por
+   * enquanto; várias telas ficam para depois. O arquivo `.ui` já vai e volta
+   * do disco (`textoTela`/`exportarTela`/`importarTela`).
    */
   readonly tela = new UiDocument('Tela 1');
+  /**
+   * Os campos da tela amarrados a valores do jogo, atualizados uma vez por
+   * quadro pelo sistema `TelaViva` (fase 'render').
+   */
+  readonly camposVivos = new CamposVivos(this.tela);
 
   selection: string | null = null;
   /** No selecionado na arvore da tela (`tela`), independente de `selection`. */
@@ -123,9 +159,17 @@ export class Editor {
   private readonly progresso = new SaveSlot<Record<string, ProgressoDaFase>>('progresso', 1);
   private estadoAnterior: string = 'jogando';
   private salvarPendente: ReturnType<typeof setTimeout> | null = null;
+  private salvarTelaPendente: ReturnType<typeof setTimeout> | null = null;
   private avisoPendente = 0;
+  /** Onde o HUD do jogo e a tela do jogador moram. */
+  private readonly palco: HTMLElement;
+  /** A tela de verdade, em DOM. Só existe durante o teste. */
+  private telaRenderer: UiRenderer | null = null;
+  /** Qual valor do jogo cada nó acompanha. Vale a sessão, não vai para o `.ui`. */
+  private readonly vivos = new Map<string, FonteViva>();
 
   constructor(canvas: HTMLCanvasElement, palco: HTMLElement) {
+    this.palco = palco;
     // O kit inicial já entra no catálogo: ninguém abre o editor de mãos
     // vazias (seção 11 — "kit já instalado, sem precisar importar nada").
     for (const { asset, bytes } of kitInicial()) this.catalogo.registrar(asset.caminho, bytes);
@@ -195,6 +239,18 @@ export class Editor {
     this.engine.add(
       followCameraSystem({ camera: this.engine.camera, input: this.engine.input, physics }),
     );
+    // O campo vivo da tela (M9): uma vez por quadro, antes de desenhar, cada
+    // ligação lê o valor do jogo e escreve no documento — que já avisa o
+    // `UiRenderer` sozinho. Fora do teste a lista está vazia e isto não custa
+    // nada, igual aos sistemas do jogo logo acima.
+    this.engine.add(
+      defineSystem({
+        name: 'TelaViva',
+        phase: 'render',
+        order: 890,
+        update: () => this.camposVivos.atualizar(),
+      }),
+    );
     this.engine.add(
       defineSystem({
         name: 'ViewportDoEditor',
@@ -214,9 +270,13 @@ export class Editor {
       this.agendarSalvar();
       this.notify();
     });
-    this.tela.on(() => this.notify());
+    this.tela.on(() => {
+      this.agendarSalvarTela();
+      this.notify();
+    });
 
     this.abrirSalvo();
+    this.abrirTelaSalva();
     this.assembler.build();
     this.engine.start();
   }
@@ -657,6 +717,57 @@ export class Editor {
     this.tela.setCor(node.id, cor);
   }
 
+  /**
+   * Pinta a tela inteira com um tema pronto (seção 10).
+   *
+   * Não tem desfazer, pela mesma decisão da fatia 1 — por isso o recado diz
+   * quantos elementos mudaram: é o que deixa claro que a escolha valeu.
+   */
+  aplicarTemaNaTela(id: string): void {
+    const tema = findTema(id);
+    if (!tema) return;
+    const mudados = aplicarTema(this.tela, tema);
+    this.aviso(
+      mudados === 0
+        ? `Tema ${tema.label}: a tela ainda não tem nenhum elemento.`
+        : `Tema ${tema.label} aplicado em ${mudados} elemento${mudados === 1 ? '' : 's'}.`,
+    );
+  }
+
+  /** Que valor do jogo este nó acompanha, ou `null` se nenhum. */
+  campoVivoDe(id: string): FonteViva | null {
+    return this.vivos.get(id) ?? null;
+  }
+
+  /**
+   * Amarra (ou solta) o campo `valor` de um nó a um valor do jogo.
+   *
+   * É sempre o `valor` porque é ele que uma barra desenha — é para isso que a
+   * mãe põe uma barra na tela. O passo de `0.01` é meio pixel numa barra de
+   * 200px: abaixo disso ninguém vê, e o navegador para de refazer estilo à toa.
+   */
+  setCampoVivo(id: string, fonte: FonteViva | null): void {
+    if (!this.tela.get(id)) return;
+    if (fonte === null) {
+      this.vivos.delete(id);
+      this.camposVivos.desligar(id, 'valor');
+    } else {
+      this.vivos.set(id, fonte);
+      this.camposVivos.ligar(id, 'valor', () => this.lerFonteViva(fonte), 0.01);
+    }
+    this.notify();
+  }
+
+  /** O valor de fonte viva, sempre de 0 a 1 (ver `FONTES_VIVAS`). */
+  private lerFonteViva(fonte: FonteViva): number {
+    if (fonte === 'vidas') return clamp01(this.partida.vidas / 3);
+    if (fonte === 'aneis') return clamp01(this.partida.aneis / 50);
+    if (fonte === 'tempo') return clamp01(this.partida.tempo / 120);
+    const heroi = this.heroSnapshot();
+    if (!heroi || heroi.maxSpeed <= 0) return 0;
+    return clamp01(heroi.speed / heroi.maxSpeed);
+  }
+
   undo(): void {
     if (this.history.undo()) {
       this.select(this.document.get(this.selection) ? this.selection : null);
@@ -693,6 +804,7 @@ export class Editor {
     this.hudJogo.invalidar();
     this.hudJogo.element.hidden = false;
 
+    this.montarTela();
     this.assembler.startPlay();
 
     // O que os scripts reclamaram aparece na barra, com a peça culpada pelo
@@ -708,6 +820,7 @@ export class Editor {
   stop(): void {
     if (this.mode === 'editar') return;
     this.hudJogo.element.hidden = true;
+    this.desmontarTela();
     this.assembler.stopPlay();
     this.engine.loop.paused = false;
     this.mode = 'editar';
@@ -715,6 +828,29 @@ export class Editor {
     this.viewport.restoreCamera();
     if (window.document.pointerLockElement) window.document.exitPointerLock();
     this.notify();
+  }
+
+  /**
+   * Põe a tela montada no painel Tela por cima do jogo, e liga o clique.
+   *
+   * É aqui que os dois lados da M9 se encontram: `@faisca/interface` avisa
+   * *qual botão* foi clicado (pelo nome que a pessoa escreveu no inspetor), e
+   * `@faisca/autoria` dispara o evento `AoClicar` em todo script vivo. Nenhum
+   * dos dois pacotes conhece o outro — quem conhece os dois é o editor.
+   *
+   * Só durante o teste: em modo de edição a tela é desenhada pelo painel, e um
+   * botão de verdade por cima do palco roubaria o clique de colocar peça.
+   */
+  private montarTela(): void {
+    this.desmontarTela();
+    const renderer = new UiRenderer(this.tela, this.palco);
+    renderer.onClique((clique) => this.assembler.cliqueNaTela(clique.nome));
+    this.telaRenderer = renderer;
+  }
+
+  private desmontarTela(): void {
+    this.telaRenderer?.dispose();
+    this.telaRenderer = null;
   }
 
   /**
@@ -836,9 +972,57 @@ export class Editor {
     }
   }
 
+  // --- Arquivo da tela (`.ui`) ----------------------------------------------
+  //
+  // Mesmo trio da cena (`texto`/`exportar`/`importar`), com a mesma decisão de
+  // offline-first: o arquivo mora na máquina, e o navegador guarda o rascunho
+  // sozinho numa chave só dele. A tela não entra no `.cena` porque são dois
+  // formatos separados no plano — quem tem duas fases e uma tela só não
+  // deveria precisar copiar a tela para dentro de cada fase.
+
+  /** O texto do arquivo `.ui`, do jeito que ele vai para o disco. */
+  textoTela(): string {
+    return writeInterface(this.tela.toData());
+  }
+
+  renomearTela(name: string): void {
+    this.tela.name = name;
+    this.agendarSalvarTela();
+    this.notify();
+  }
+
+  exportarTela(): void {
+    const blob = new Blob([this.textoTela()], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = window.document.createElement('a');
+    link.href = url;
+    link.download = `${slug(this.tela.name, 'tela')}.ui`;
+    link.click();
+    URL.revokeObjectURL(url);
+    this.aviso('Tela baixada.');
+  }
+
+  importarTela(texto: string): void {
+    try {
+      const dados = readInterface(texto);
+      this.tela.load(dados);
+      // As ligações vivas são por nó, e os nós que vieram do arquivo são
+      // outros: manter as antigas amarraria valor de jogo a nó que não existe.
+      this.vivos.clear();
+      this.camposVivos.limpar();
+      this.selectTela(null);
+      this.aviso(`Tela "${dados.name}" carregada.`);
+    } catch (erro) {
+      this.aviso(erro instanceof Error ? erro.message : 'Não consegui ler este arquivo de tela.');
+    }
+  }
+
   dispose(): void {
     if (this.salvarPendente) clearTimeout(this.salvarPendente);
     this.salvarPendente = null;
+    if (this.salvarTelaPendente) clearTimeout(this.salvarTelaPendente);
+    this.salvarTelaPendente = null;
+    this.desmontarTela();
     this.viewport.dispose();
     this.assembler.dispose();
     this.hud.dispose();
@@ -903,6 +1087,39 @@ export class Editor {
   }
 
   /**
+   * O rascunho da tela guardado na máquina.
+   *
+   * Tela vazia é um começo legítimo (nem todo projeto tem HUD), então aqui não
+   * existe "tela de exemplo": sem rascunho, a tela fica em branco mesmo.
+   */
+  private abrirTelaSalva(): void {
+    let texto: string | null = null;
+    try {
+      texto = localStorage.getItem(CHAVE_TELA);
+    } catch {
+      texto = null;
+    }
+    if (!texto) return;
+    try {
+      this.tela.load(readInterface(texto));
+    } catch {
+      this.aviso('O rascunho da tela estava quebrado; comecei uma tela vazia.');
+    }
+  }
+
+  private agendarSalvarTela(): void {
+    if (this.salvarTelaPendente) clearTimeout(this.salvarTelaPendente);
+    this.salvarTelaPendente = setTimeout(() => {
+      this.salvarTelaPendente = null;
+      try {
+        localStorage.setItem(CHAVE_TELA, this.textoTela());
+      } catch {
+        this.aviso('Não consegui salvar a tela na máquina. Baixe o arquivo .ui.');
+      }
+    }, 500);
+  }
+
+  /**
    * Salvar sozinho, um pouco depois da ultima mudanca.
    *
    * Offline-first e decisao de plano (secao 2): a fase mora na maquina e nao
@@ -956,12 +1173,17 @@ function caminhoDoArquivo(arquivo: File): string {
   return relativo && relativo.length > 0 ? relativo : `assets/${arquivo.name}`;
 }
 
-function slug(nome: string): string {
+function clamp01(valor: number): number {
+  if (!Number.isFinite(valor)) return 0;
+  return Math.max(0, Math.min(1, valor));
+}
+
+function slug(nome: string, padrao = 'fase'): string {
   const limpo = nome
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '');
-  return limpo || 'fase';
+  return limpo || padrao;
 }

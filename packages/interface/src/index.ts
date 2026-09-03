@@ -6,7 +6,9 @@
  *
  * Fatia 1: o modelo de dados, puro e testavel. Fatia 2: o painel de edicao
  * por arrastar no editor (`apps/editor`). Fatia 3: o `UiRenderer`, que
- * sincroniza o documento com elementos DOM de verdade.
+ * sincroniza o documento com elementos DOM de verdade. Fatia 4: o clique de
+ * botao (`onClique`), os campos vivos (`CamposVivos`) e os temas prontos
+ * (`TEMAS`) — o que fechou a M9.
  */
 export {
   UiDocument,
@@ -34,4 +36,10 @@ export {
   calcularAparencia,
   calcularPosicao,
   calcularPreenchimento,
+  type Clique,
+  type CliqueListener,
 } from './renderizador.ts';
+
+export { CamposVivos, type Fonte, type Ligacao } from './vivo.ts';
+
+export { TEMAS, aplicarTema, findTema, type EstiloDoTipo, type Tema } from './temas.ts';

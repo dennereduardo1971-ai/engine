@@ -95,6 +95,18 @@ export const EVENTOS: readonly EventoDefinicao[] = [
       'Roda quando o personagem se afasta desta peça. É o par de "chegar aqui": ' +
       'com os dois, uma porta abre na entrada e fecha na saída.',
   },
+  {
+    // O primeiro evento que nao vem da cena 3D: ele vem da *tela* montada no
+    // painel Tela (`@faisca/interface`). O que ele entrega e o **nome** do
+    // botao, e nao um id: nome e o que a mae escreveu no inspetor e o que ela
+    // le na regra. Por isso o script ouve o clique de qualquer botao e compara
+    // o nome dentro, em vez de existir um evento por botao — a tela pode ter
+    // dez botoes e o catalogo continua com um evento so.
+    nome: 'AoClicar',
+    forma: 'quando o botão for clicado',
+    parametro: 'botao',
+    ajuda: 'Roda quando alguém clica num botão da tela. Entrega o nome do botão clicado.',
+  },
 ];
 
 export const BLOCOS: readonly BlocoDefinicao[] = [

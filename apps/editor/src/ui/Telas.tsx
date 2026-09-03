@@ -1,5 +1,6 @@
-import { elementoOuPlaceholder, ELEMENTOS, type Ancora, type UiNode } from '@faisca/interface';
-import { type Editor } from '../editor.ts';
+import { useRef } from 'react';
+import { elementoOuPlaceholder, ELEMENTOS, TEMAS, type Ancora, type UiNode } from '@faisca/interface';
+import { FONTES_VIVAS, fonteVivaValida, type Editor } from '../editor.ts';
 import { Numero, Texto, pararTeclas } from './campos.tsx';
 
 const ANCORAS: { id: Ancora; titulo: string }[] = [
@@ -24,12 +25,64 @@ const ANCORAS: { id: Ancora; titulo: string }[] = [
  * sem desfazer, decisão que já vem da fatia 1 do documento `.ui`.
  */
 export function Telas({ editor }: { editor: Editor }) {
+  const arquivo = useRef<HTMLInputElement>(null);
+
   return (
     <section className="painel telas">
       <h2>
         Tela
         <small>{editor.tela.count} elementos</small>
       </h2>
+
+      <label className="campo">
+        <span className="rotulo">Nome da tela</span>
+        <Texto valor={editor.tela.name} onChange={(valor) => editor.renomearTela(valor)} />
+      </label>
+
+      {/*
+        Tema: a escolha não fica "grudada" na tela — aplicar é uma ação, não um
+        estado. Por isso o `select` volta para "Trocar o visual…" depois de
+        pintar: quem mexeu na cor de um botão sozinho depois não vê a interface
+        mentindo que a tela inteira ainda é "Noite".
+      */}
+      <label className="campo">
+        <span className="rotulo">Tema</span>
+        <select
+          value=""
+          onChange={(event) => {
+            if (event.target.value) editor.aplicarTemaNaTela(event.target.value);
+          }}
+          {...pararTeclas}
+        >
+          <option value="">Trocar o visual…</option>
+          {TEMAS.map((tema) => (
+            <option key={tema.id} value={tema.id} title={tema.hint}>
+              {tema.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <div className="linha-de-opcoes">
+        <button type="button" onClick={() => editor.exportarTela()} title="Baixa o arquivo .ui">
+          Baixar
+        </button>
+        <button type="button" onClick={() => arquivo.current?.click()} title="Abre um arquivo .ui">
+          Abrir
+        </button>
+        <input
+          ref={arquivo}
+          type="file"
+          accept=".ui,.json,.txt,text/plain"
+          hidden
+          onChange={async (event) => {
+            const escolhido = event.target.files?.[0];
+            event.target.value = '';
+            if (escolhido) editor.importarTela(await escolhido.text());
+          }}
+          {...pararTeclas}
+        />
+      </div>
 
       <div className="grade-de-pecas">
         {ELEMENTOS.map((elemento) => (
@@ -133,6 +186,33 @@ function TelaInspetor({ editor, node }: { editor: Editor; node: UiNode }) {
             placeholder={elemento.texto}
             onChange={(valor) => editor.setTelaTexto(valor)}
           />
+        </label>
+      )}
+
+      {/*
+        Só barra tem "valor vivo": é o único elemento cujo campo principal é um
+        número de 0 a 1, que é o que as fontes do jogo entregam. Um texto que
+        mostrasse a contagem de anéis precisaria de outra coisa (texto, não
+        número), e isso não é desta fatia.
+      */}
+      {elemento.kind !== 'barra' ? null : (
+        <label className="campo" title="A barra acompanha sozinha este valor do jogo, a cada quadro.">
+          <span className="rotulo">Valor vivo</span>
+          <select
+            value={editor.campoVivoDe(node.id) ?? ''}
+            onChange={(event) => {
+              const escolhido = event.target.value;
+              editor.setCampoVivo(node.id, fonteVivaValida(escolhido) ? escolhido : null);
+            }}
+            {...pararTeclas}
+          >
+            <option value="">(nenhum)</option>
+            {FONTES_VIVAS.map((fonte) => (
+              <option key={fonte.id} value={fonte.id}>
+                {fonte.label}
+              </option>
+            ))}
+          </select>
         </label>
       )}
 

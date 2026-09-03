@@ -6,11 +6,11 @@
  * mora em `@faisca/runtime`: a sincronização é dirigida pelos eventos que o
  * próprio `UiDocument.on` já emite (fatia 1), não por um laço a cada quadro —
  * então `@faisca/interface` não precisa depender do runtime para isto.
- * Ligar isto a um sistema de fase 'render' (como `GameHud.system()` faz em
- * `kit-velocidade/src/hud.ts`) fica para quando algum campo precisar de valor
- * vivo a cada quadro (ex.: uma "barra" amarrada à vida do personagem) — hoje
- * todo campo muda por uma chamada explícita no documento, e cada chamada já
- * dispara o próprio evento que atualiza o elemento certo.
+ * Campo com valor vivo a cada quadro (ex.: uma "barra" amarrada à vida do
+ * personagem) tem casa própria em `vivo.ts`: a tabela de ligações mora lá, e
+ * quem chama `atualizar()` num sistema de fase 'render' é quem já depende do
+ * runtime (o editor, um kit). Aqui continua valendo que toda mudança de campo
+ * chega por um evento do documento, e cada evento atualiza só o elemento certo.
  *
  * As funções puras (`calcularPosicao`, `calcularAparencia`) são o que dá para
  * testar sem uma janela de verdade: o resto, a classe `UiRenderer`, mexe em
@@ -109,17 +109,27 @@ export function calcularPreenchimento(node: UiNode, elemento: Elemento): string 
   return `${Math.max(0, Math.min(1, valor)) * 100}%`;
 }
 
+/** O botão que foi clicado, do jeito que uma regra fala dele. */
+export interface Clique {
+  id: string;
+  /** O nome do nó — é o que a pessoa escreveu no inspetor, e o que a regra lê. */
+  nome: string;
+}
+
+export type CliqueListener = (clique: Clique) => void;
+
 /**
  * Sincroniza um `UiDocument` com elementos DOM reais dentro de `parent`.
  *
  * Uma tela é sempre por cima do jogo e nunca captura clique — exceto o botão,
- * que precisa ser clicável para o gatilho "quando o botão for clicado" (ainda
- * em `@faisca/blocos`, fica para a próxima fatia) funcionar.
+ * que é clicável para o gatilho "quando o botão for clicado" (`AoClicar`, no
+ * catálogo de `@faisca/blocos`) funcionar.
  */
 export class UiRenderer {
   readonly root: HTMLElement;
   private readonly elementos = new Map<string, HTMLElement>();
   private readonly preenchimentos = new Map<string, HTMLElement>();
+  private readonly cliques = new Set<CliqueListener>();
   private readonly solta: () => void;
 
   constructor(
@@ -130,6 +140,10 @@ export class UiRenderer {
     this.root.className = 'faisca-tela';
     Object.assign(this.root.style, { position: 'absolute', inset: '0', pointerEvents: 'none' });
     parent.append(this.root);
+    // Um ouvinte só, na raiz: a tela pode ganhar e perder botões o tempo todo,
+    // e um ouvinte por elemento seria um a mais para lembrar de soltar em cada
+    // `remove`. Aqui o `dispose` da raiz leva o clique junto.
+    this.root.addEventListener('click', this.aoClicar);
     this.solta = documento.on((mudanca) => this.aplicar(mudanca));
     this.reconstruir();
   }
@@ -139,10 +153,39 @@ export class UiRenderer {
     return this.elementos.get(id) ?? null;
   }
 
+  /**
+   * Avisa quando um botão da tela é clicado.
+   *
+   * É este o fio entre a tela montada no editor e o evento `AoClicar` dos
+   * blocos: quem tem os scripts vivos (o montador, no `@faisca/autoria`)
+   * escuta aqui e dispara o evento. `@faisca/interface` continua sem saber o
+   * que é um script — ela só diz *qual botão* foi clicado.
+   */
+  onClique(listener: CliqueListener): () => void {
+    this.cliques.add(listener);
+    return () => this.cliques.delete(listener);
+  }
+
   dispose(): void {
     this.solta();
+    this.cliques.clear();
+    this.root.removeEventListener('click', this.aoClicar);
     this.root.remove();
   }
+
+  private readonly aoClicar = (evento: Event): void => {
+    const alvo = evento.target;
+    if (!(alvo instanceof HTMLElement)) return;
+    const el = alvo.closest<HTMLElement>('[data-id]');
+    const id = el?.dataset.id;
+    if (!id) return;
+    const node = this.documento.get(id);
+    // Só botão, e só botão visível: um painel por cima do jogo não é um
+    // gatilho, e um botão escondido não deveria disparar nada.
+    if (!node || !node.visible) return;
+    if (elementoOuPlaceholder(node.elemento).kind !== 'botao') return;
+    for (const listener of this.cliques) listener({ id, nome: node.name });
+  };
 
   private aplicar(mudanca: UiChange): void {
     if (mudanca.kind === 'reload') {

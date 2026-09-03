@@ -373,7 +373,7 @@ M5 ✅ blocos ⇄ código · M6 ✅ gatilho-e-resposta e perfil Design · M7 ✅
 ### Mês 3 — Família
 M9 editor de interface e menus · M10 diálogos e cutscenes · M11 publicar link + galeria · M12 Modo Criança com narração
 
-> **Sobre a M9 (em andamento, fatia 3 entregue).** Mesma receita da M8: fatias
+> **Sobre a M9 (fechada, quatro fatias entregues).** Mesma receita da M8: fatias
 > finas, começando pelo pacote-base puro e testável, sem UI. A primeira fatia
 > é `@faisca/interface`, análogo a `@faisca/autoria` mas para telas 2D em vez
 > de cenas 3D: um catálogo de elementos (`elementos.ts` — texto, botão,
@@ -406,12 +406,45 @@ M9 editor de interface e menus · M10 diálogos e cutscenes · M11 publicar link
 > que mexe em `document`/DOM de verdade não tem teste unitário, mesma
 > convenção de `GameHud` — o repositório não tem jsdom/happy-dom instalado.
 >
-> O que fica para as próximas fatias, por escolha explícita: o evento "quando
-> o botão for clicado" no catálogo de `@faisca/blocos`, para virar gatilho de
-> regra; um sistema de fase `'render'` amarrando um campo a um valor vivo do
-> jogo a cada quadro (ex.: uma barra de vida), para quando algum kit precisar
-> disso; os "temas prontos" da seção 10; e o arquivo `.ui` de projeto
-> lido/gravado no disco pelo editor.
+> A quarta fatia fecha os quatro adiamentos que as anteriores tinham deixado
+> escritos, e com eles a M9:
+>
+> - **O clique do botão vira gatilho de regra.** O catálogo de
+>   `@faisca/blocos` ganha o evento `AoClicar` ("quando o botão for clicado"),
+>   que entrega o **nome** do botão — um evento só serve a tela inteira, em vez
+>   de um evento por botão. O fio tem três pedaços, um por pacote, sem nenhum
+>   deles passar a conhecer o outro: `UiRenderer.onClique` (em
+>   `@faisca/interface`) só diz *qual botão*, com um ouvinte único na raiz;
+>   `Montador.cliqueNaTela(nome)` (em `@faisca/autoria`) dispara `AoClicar` em
+>   todo script vivo, porque um botão de tela não é peça da cena e não tem
+>   dono; e o editor, que já depende dos dois, é o único lugar onde as pontas
+>   se encontram. A tela só é montada durante o play — em modo de edição um
+>   botão de verdade por cima do palco roubaria o clique de colocar peça.
+> - **Campo vivo por quadro.** `CamposVivos` (`packages/interface/src/vivo.ts`)
+>   é a tabela "este campo deste nó vale o que esta função devolver", com um
+>   `atualizar()` que passa por ela; quem a chama a cada quadro é um sistema de
+>   fase `'render'` criado pelo editor (`TelaViva`, ordem 890), e não pelo
+>   pacote — `@faisca/interface` continua sem depender de `@faisca/runtime`,
+>   mesma decisão da fatia 3, e em troca a conta é testável sem janela e sem
+>   laço de jogo. Uma ligação tem `passo` de arredondamento (`0.01` numa barra
+>   de 200px é meio pixel) para uma barra amarrada ao relógio não refazer o
+>   estilo do elemento a cada quadro; nó que sumiu da tela some da lista, e
+>   valor que não é número deixa o campo como estava. No editor a barra
+>   escolhe a fonte por um `select` (Vidas, Anéis, Tempo, Velocidade), todas
+>   normalizadas de 0 a 1 porque o campo que as recebe é o `valor` da barra.
+> - **Temas prontos** (`packages/interface/src/temas.ts`), o que a seção 10
+>   pedia junto do "arrastar": Noite, Papel, Doce e Arcade. Um tema é uma
+>   tabela por **tipo** de elemento, e não por nó, para valer também para o
+>   próximo elemento arrastado; `aplicarTema` só chama `setCor`/`setFields`,
+>   que já emitem os eventos que o `UiRenderer` escuta, e deixa intacto o nó
+>   de um tipo que o tema não conhece.
+> - **O `.ui` no disco.** O editor grava a tela em `localStorage` com chave
+>   própria (`faisca:fase-01.ui`, com o mesmo atraso de 500 ms do `.cena`) e
+>   tem Baixar/Abrir no painel Tela, pelo `readInterface`/`writeInterface` que
+>   a fatia 1 já tinha. Chave e arquivo separados do `.cena` de propósito: são
+>   dois formatos no plano, e quem tem duas fases e uma tela só não deveria
+>   copiar a tela para dentro de cada fase. Abrir um `.ui` solta as ligações
+>   de campo vivo — os nós carregados são outros nós.
 
 ### Depois
 Co-op local em tela dividida · nuvem e colaboração ao vivo · nós/grafo · Android · assistente de IA · online privado · 2D completo com tilemap · WebGPU como padrão quando o hardware permitir.

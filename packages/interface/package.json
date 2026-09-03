@@ -1,0 +1,11 @@
+{
+  "name": "@faisca/interface",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Camada de interface da Faisca: documento de tela, catalogo de elementos e formato .ui",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

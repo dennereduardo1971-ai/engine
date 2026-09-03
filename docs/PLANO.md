@@ -373,6 +373,24 @@ M5 ✅ blocos ⇄ código · M6 ✅ gatilho-e-resposta e perfil Design · M7 ✅
 ### Mês 3 — Família
 M9 editor de interface e menus · M10 diálogos e cutscenes · M11 publicar link + galeria · M12 Modo Criança com narração
 
+> **Sobre a M9 (em andamento, fatia 1 entregue).** Mesma receita da M8: fatias
+> finas, começando pelo pacote-base puro e testável, sem UI. A primeira fatia
+> é `@faisca/interface`, análogo a `@faisca/autoria` mas para telas 2D em vez
+> de cenas 3D: um catálogo de elementos (`elementos.ts` — texto, botão,
+> imagem, barra de progresso, painel), o documento editável de uma tela
+> (`UiDocument`/`UiNode`, ancorada por canto/borda em vez de posição absoluta,
+> para sobreviver a mudança de tamanho de tela) e o formato de arquivo `.ui`
+> que grava só o que foi editado, um elemento por linha — o mesmo corte que
+> o `.cena` já faz. Sem `History`/desfazer nesta fatia, mesma decisão que a
+> M8 tomou para o catálogo de assets.
+>
+> O que fica para as próximas fatias, por escolha explícita: o painel no
+> editor para montar uma tela arrastando; um sistema no runtime que
+> sincroniza `UiDocument` com elementos DOM de verdade (o que permitiria
+> aposentar o HUD hardcoded de `kit-velocidade/src/hud.ts`); o evento "quando
+> o botão for clicado" no catálogo de `@faisca/blocos`, para virar gatilho de
+> regra; e os "temas prontos" da seção 10.
+
 ### Depois
 Co-op local em tela dividida · nuvem e colaboração ao vivo · nós/grafo · Android · assistente de IA · online privado · 2D completo com tilemap · WebGPU como padrão quando o hardware permitir.
 

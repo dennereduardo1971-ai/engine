@@ -311,6 +311,15 @@ M5 ✅ blocos ⇄ código · M6 ✅ gatilho-e-resposta e perfil Design · M7 ✅
 > testar aqui, só o encanamento de ler `File.webkitRelativePath`. Um
 > watcher de disco de verdade (fora do navegador), foto-vira-sprite e a
 > compressão KTX2/Draco ficam para as próximas fatias da M8.
+>
+> A quarta fatia tira o GLB (glTF binário) da lista de "reconhecido, ainda
+> sem importador": `validarGlb` confere a assinatura `glTF`, o tamanho do
+> arquivo batendo com o cabeçalho, e que o primeiro bloco é um JSON com o
+> campo `asset` que todo glTF 2.0 tem — o suficiente para separar um
+> modelo de verdade de um arquivo corrompido antes de aceitar no
+> catálogo, sem montar a cena (isso é trabalho do motor 3D, que ainda não
+> lê glTF). glTF em texto (`.gltf`, que aponta para `.bin` e texturas à
+> parte), Blender, Tiled e Aseprite continuam só reconhecidos.
 
 > **Sobre a M7.** A pista sai de uma curva Catmull-Rom desenhada clicando no
 > viewport (ferramenta **Pista**): cada ponto guarda posição, largura e

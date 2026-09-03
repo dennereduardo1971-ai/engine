@@ -7,8 +7,10 @@ import { type AssetKind } from './tipos.ts';
  * arquivo e um asset da Faisca, so ainda nao sabe le-lo. Isso separa dois
  * erros bem diferentes para quem arrastou o arquivo — "esse formato nao
  * existe aqui" contra "esse formato ainda esta por vir" — e da um lugar
- * obvio para plugar cada importador que faltar (glTF/GLB, Blender, Tiled,
- * Aseprite) sem mexer no resto do pipeline.
+ * obvio para plugar cada importador que faltar (glTF, Blender, Tiled,
+ * Aseprite) sem mexer no resto do pipeline. GLB (glTF binario) ja saiu
+ * dessa lista: `validarGlb` em `glb.ts` confere a assinatura antes de
+ * aceitar.
  */
 interface FormatoInfo {
   tipo: AssetKind;
@@ -20,7 +22,7 @@ const FORMATOS: Record<string, FormatoInfo> = {
   wav: { tipo: 'som', suportado: true },
   ogg: { tipo: 'som', suportado: true },
   gltf: { tipo: 'modelo', suportado: false },
-  glb: { tipo: 'modelo', suportado: false },
+  glb: { tipo: 'modelo', suportado: true },
   blend: { tipo: 'modelo', suportado: false },
   tmx: { tipo: 'modelo', suportado: false },
   ase: { tipo: 'textura', suportado: false },

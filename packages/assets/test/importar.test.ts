@@ -5,6 +5,25 @@ function bytes(texto: string): Uint8Array {
   return new TextEncoder().encode(texto);
 }
 
+/** Um GLB minimo mas valido, so para testar que o pipeline aceita o formato. */
+function glbValido(): Uint8Array {
+  const json = new TextEncoder().encode(JSON.stringify({ asset: { version: '2.0' } }));
+  const preenchido = (json.length + 3) & ~3;
+  const jsonBytes = new Uint8Array(preenchido).fill(0x20);
+  jsonBytes.set(json);
+
+  const tamanhoTotal = 12 + 8 + jsonBytes.length;
+  const glb = new Uint8Array(tamanhoTotal);
+  const vista = new DataView(glb.buffer);
+  vista.setUint32(0, 0x46546c67, true);
+  vista.setUint32(4, 2, true);
+  vista.setUint32(8, tamanhoTotal, true);
+  vista.setUint32(12, jsonBytes.length, true);
+  vista.setUint32(16, 0x4e4f534a, true);
+  glb.set(jsonBytes, 20);
+  return glb;
+}
+
 describe('importarAsset', () => {
   it('reconhece PNG como textura', () => {
     const asset = importarAsset('assets/texturas/heroi.png', bytes('fake-png'), {
@@ -41,8 +60,21 @@ describe('importarAsset', () => {
   });
 
   it('reconhece um formato do plano que ainda nao tem importador', () => {
-    expect(() => importarAsset('assets/modelos/heroi.glb', bytes('x'))).toThrow(
+    expect(() => importarAsset('assets/modelos/heroi.blend', bytes('x'))).toThrow(
       /ainda não têm importação automática/,
+    );
+  });
+
+  it('reconhece GLB como modelo, validando a estrutura do arquivo', () => {
+    const glb = glbValido();
+    const asset = importarAsset('assets/modelos/heroi.glb', glb);
+    expect(asset.tipo).toBe('modelo');
+    expect(asset.formato).toBe('glb');
+  });
+
+  it('recusa um GLB corrompido com mensagem em portugues', () => {
+    expect(() => importarAsset('assets/modelos/heroi.glb', bytes('nao-e-um-glb'))).toThrow(
+      /GLB inválido/,
     );
   });
 

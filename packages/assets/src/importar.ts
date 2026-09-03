@@ -1,4 +1,5 @@
 import { extensaoDe, formatoDe } from './formatos.ts';
+import { validarGlb } from './glb.ts';
 import { hashBytes } from './hash.ts';
 import { type AssetKind, type AssetMeta } from './tipos.ts';
 
@@ -38,6 +39,10 @@ export function importarAsset(
         'use PNG para imagens e WAV ou OGG para sons e músicas.',
     );
   }
+
+  // GLB tem estrutura de verdade para conferir (assinatura, blocos) — os
+  // outros formatos suportados ainda sao aceitos so pela extensao.
+  if (extensao === 'glb') validarGlb(bytes);
 
   const agora = opcoes.agora ?? Date.now;
   return {

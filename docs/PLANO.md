@@ -373,7 +373,7 @@ M5 ✅ blocos ⇄ código · M6 ✅ gatilho-e-resposta e perfil Design · M7 ✅
 ### Mês 3 — Família
 M9 editor de interface e menus · M10 diálogos e cutscenes · M11 publicar link + galeria · M12 Modo Criança com narração
 
-> **Sobre a M9 (em andamento, fatia 2 entregue).** Mesma receita da M8: fatias
+> **Sobre a M9 (em andamento, fatia 3 entregue).** Mesma receita da M8: fatias
 > finas, começando pelo pacote-base puro e testável, sem UI. A primeira fatia
 > é `@faisca/interface`, análogo a `@faisca/autoria` mas para telas 2D em vez
 > de cenas 3D: um catálogo de elementos (`elementos.ts` — texto, botão,
@@ -394,12 +394,24 @@ M9 editor de interface e menus · M10 diálogos e cutscenes · M11 publicar link
 > existem para a árvore de cena e o inspetor (grade de elementos, lista com
 > seleção, campos de âncora/deslocamento/texto/cor), sem estilo novo.
 >
-> O que fica para as próximas fatias, por escolha explícita: um sistema no
-> runtime que sincroniza `UiDocument` com elementos DOM de verdade (o que
-> permitiria aposentar o HUD hardcoded de `kit-velocidade/src/hud.ts`); o
-> evento "quando o botão for clicado" no catálogo de `@faisca/blocos`, para
-> virar gatilho de regra; os "temas prontos" da seção 10; e o arquivo `.ui`
-> de projeto lido/gravado no disco pelo editor.
+> A terceira fatia é o `UiRenderer` (`packages/interface/src/renderizador.ts`):
+> a sincronização de `UiDocument` com elementos DOM de verdade, o que já
+> permite aposentar o HUD hardcoded de `kit-velocidade/src/hud.ts` quando
+> algum kit quiser trocar. Ela não mora em `@faisca/runtime` nem é um sistema
+> de fase `'render'` como o `visualSyncSystem` da cena 3D: é dirigida pelos
+> eventos que o próprio `UiDocument.on` já emite (fatia 1), então
+> `@faisca/interface` continua sem depender do runtime. As contas de estilo
+> (posição por âncora, aparência por tipo de elemento, largura do
+> preenchimento da barra) são funções puras e testadas; a classe `UiRenderer`
+> que mexe em `document`/DOM de verdade não tem teste unitário, mesma
+> convenção de `GameHud` — o repositório não tem jsdom/happy-dom instalado.
+>
+> O que fica para as próximas fatias, por escolha explícita: o evento "quando
+> o botão for clicado" no catálogo de `@faisca/blocos`, para virar gatilho de
+> regra; um sistema de fase `'render'` amarrando um campo a um valor vivo do
+> jogo a cada quadro (ex.: uma barra de vida), para quando algum kit precisar
+> disso; os "temas prontos" da seção 10; e o arquivo `.ui` de projeto
+> lido/gravado no disco pelo editor.
 
 ### Depois
 Co-op local em tela dividida · nuvem e colaboração ao vivo · nós/grafo · Android · assistente de IA · online privado · 2D completo com tilemap · WebGPU como padrão quando o hardware permitir.

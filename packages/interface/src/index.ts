@@ -4,9 +4,9 @@
  * O documento de uma tela (HUD, menu), o catalogo de elementos com que ela e
  * montada, e o formato `.ui` que grava tudo isso em texto legivel.
  *
- * Fatia 1 da M9: so o modelo de dados, puro e testavel. Sem editor de
- * arrastar (fatia 2) e sem sistema no runtime que sincroniza isto com DOM de
- * verdade (fatia 3) ainda.
+ * Fatia 1: o modelo de dados, puro e testavel. Fatia 2: o painel de edicao
+ * por arrastar no editor (`apps/editor`). Fatia 3: o `UiRenderer`, que
+ * sincroniza o documento com elementos DOM de verdade.
  */
 export {
   UiDocument,
@@ -28,3 +28,10 @@ export {
 } from './elementos.ts';
 
 export { readInterface, writeInterface } from './formato.ts';
+
+export {
+  UiRenderer,
+  calcularAparencia,
+  calcularPosicao,
+  calcularPreenchimento,
+} from './renderizador.ts';

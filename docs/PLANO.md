@@ -278,7 +278,7 @@ Entrega em fatias. Cada fatia é um pull request, e termina com **algo que você
 ### Mês 2 — Autoria de verdade
 M5 ✅ blocos ⇄ código · M6 ✅ gatilho-e-resposta e perfil Design · M7 ✅ spline de pista · M8 importação de assets e kit inicial
 
-> **Sobre a M8 (em andamento).** A primeira fatia é o pipeline de
+> **Sobre a M8 (fechada, com adiamentos explícitos).** A primeira fatia é o pipeline de
 > importação em si (`@faisca/assets`): reconhecer o formato pela extensão,
 > gerar metadados (tipo, hash, tamanho) e decidir se um caminho é
 > importação nova, reimportação com o arquivo mudado, ou o mesmo de sempre
@@ -320,6 +320,37 @@ M5 ✅ blocos ⇄ código · M6 ✅ gatilho-e-resposta e perfil Design · M7 ✅
 > catálogo, sem montar a cena (isso é trabalho do motor 3D, que ainda não
 > lê glTF). glTF em texto (`.gltf`, que aponta para `.bin` e texturas à
 > parte), Blender, Tiled e Aseprite continuam só reconhecidos.
+>
+> A quinta fatia fecha os quatro importadores que faltavam, na mesma
+> receita: validação estrutural de verdade, sem montar cena, sem
+> dependência nova. `.gltf` reaproveita a mesma regra do bloco JSON do GLB
+> (`validarDocumentoGltf`, agora compartilhada entre os dois); `.tmx`
+> (Tiled) é lido como texto e confere a tag `<map>` com `width`, `height`,
+> `tilewidth` e `tileheight`, sem parser de XML; `.ase`/`.aseprite` confere
+> a assinatura `0xA5E0` do cabeçalho de 128 bytes e o tamanho declarado; e
+> `.blend` aceita tanto o `.blend` normal (assinatura `BLENDER`) quanto o
+> comprimido (assinatura gzip), sem entrar nos blocos DNA internos. Com
+> isso os seis formatos da seção 11 saem de "reconhecido, ainda sem
+> importador" — nenhum usa mais essa marca hoje, embora o campo continue
+> existindo para o próximo formato que entrar assim.
+>
+> O que fica de fora da M8, por escolha explícita e não por esquecimento:
+> **foto-vira-sprite** (uma foto de desenho em papel virando sprite) exige
+> decodificar imagem de verdade — JPEG de câmera de celular, com todo o
+> ruído que isso traz — o que não dá para fazer à mão com a mesma
+> confiabilidade do encoder PNG hoje existente; e a **compressão agressiva
+> no publish** (KTX2/Basis para textura, Draco para malha) exige
+> codificadores binários reais, não algo hand-rolled. As duas coisas
+> pedem trazer dependência nova para o monorepo — decisão que a M8 optou
+> por não tomar agora, para manter `@faisca/assets` e `@faisca/kit-inicial`
+> sem dependências externas, como o encoder de PNG e o de WAV já são. Ficam
+> como trabalho futuro, fora desta milestone: um watcher de disco de
+> verdade fora do navegador também é adiamento da terceira fatia, pelo
+> mesmo motivo (exigiria um processo Node rodando ao lado do editor, hoje
+> fora do escopo). O que a M8 entrega fechado: os seis formatos do plano
+> com validação estrutural real, o painel de Assets do editor, a
+> sincronização de pasta, e o kit inicial gerado por código como
+> placeholder — a arte licenciada final da seção 11 continua pendente.
 
 > **Sobre a M7.** A pista sai de uma curva Catmull-Rom desenhada clicando no
 > viewport (ferramenta **Pista**): cada ponto guarda posição, largura e

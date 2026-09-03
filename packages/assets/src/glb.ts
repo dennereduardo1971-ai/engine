@@ -1,14 +1,15 @@
 /**
- * Validação mínima de um GLB (glTF binário) — seção 11, o primeiro dos
- * quatro formatos "reconhecido, ainda sem importador" a ganhar leitura de
- * verdade.
+ * Validação mínima de um GLB (glTF binário) — seção 11.
  *
  * Não monta a cena (isso é trabalho do motor 3D, que ainda não sabe
  * desenhar um glTF): só confere que o arquivo é mesmo um GLB — assinatura,
  * tamanho batendo com o cabeçalho, e um primeiro bloco JSON com o campo
- * `asset` que todo glTF 2.0 tem. É o suficiente para separar "arquivo bom"
- * de "arquivo corrompido ou não é isso" antes de aceitar no catálogo.
+ * `asset` que todo glTF 2.0 tem (checado por `validarDocumentoGltf`, a
+ * mesma regra usada pelo `.gltf` em texto). É o suficiente para separar
+ * "arquivo bom" de "arquivo corrompido ou não é isso" antes de aceitar no
+ * catálogo.
  */
+import { validarDocumentoGltf } from './gltf.ts';
 
 const ASSINATURA = 0x46546c67; // "glTF" em little-endian
 const TIPO_JSON = 0x4e4f534a; // "JSON" em little-endian
@@ -49,7 +50,9 @@ export function validarGlb(bytes: Uint8Array): void {
   } catch {
     throw new Error('Faísca: GLB inválido — o bloco JSON não é um JSON válido.');
   }
-  if (typeof doc !== 'object' || doc === null || !('asset' in doc)) {
+  try {
+    validarDocumentoGltf(doc);
+  } catch {
     throw new Error('Faísca: GLB inválido — falta o campo "asset" que todo glTF tem.');
   }
 }

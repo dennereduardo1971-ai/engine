@@ -59,12 +59,6 @@ describe('importarAsset', () => {
     );
   });
 
-  it('reconhece um formato do plano que ainda nao tem importador', () => {
-    expect(() => importarAsset('assets/modelos/heroi.blend', bytes('x'))).toThrow(
-      /ainda não têm importação automática/,
-    );
-  });
-
   it('reconhece GLB como modelo, validando a estrutura do arquivo', () => {
     const glb = glbValido();
     const asset = importarAsset('assets/modelos/heroi.glb', glb);
@@ -75,6 +69,44 @@ describe('importarAsset', () => {
   it('recusa um GLB corrompido com mensagem em portugues', () => {
     expect(() => importarAsset('assets/modelos/heroi.glb', bytes('nao-e-um-glb'))).toThrow(
       /GLB inválido/,
+    );
+  });
+
+  it('reconhece um .gltf em texto, validando o JSON', () => {
+    const gltf = bytes(JSON.stringify({ asset: { version: '2.0' } }));
+    const asset = importarAsset('assets/modelos/heroi.gltf', gltf);
+    expect(asset.tipo).toBe('modelo');
+    expect(() => importarAsset('assets/modelos/heroi.gltf', bytes('{ nao'))).toThrow(
+      /glTF inválido/,
+    );
+  });
+
+  it('reconhece um .tmx, validando a tag "<map>"', () => {
+    const tmx = bytes('<map tilewidth="16" tileheight="16" width="20" height="15"></map>');
+    const asset = importarAsset('assets/mapas/fase1.tmx', tmx);
+    expect(asset.tipo).toBe('modelo');
+    expect(() => importarAsset('assets/mapas/fase1.tmx', bytes('<xml></xml>'))).toThrow(
+      /TMX inválido/,
+    );
+  });
+
+  it('reconhece um .aseprite, validando o cabecalho', () => {
+    const ase = new Uint8Array(128);
+    new DataView(ase.buffer).setUint32(0, ase.length, true);
+    new DataView(ase.buffer).setUint16(4, 0xa5e0, true);
+    const asset = importarAsset('assets/texturas/heroi.aseprite', ase);
+    expect(asset.tipo).toBe('textura');
+    expect(() => importarAsset('assets/texturas/heroi.aseprite', bytes('x'))).toThrow(
+      /Aseprite inválido/,
+    );
+  });
+
+  it('reconhece um .blend, validando a assinatura', () => {
+    const blend = bytes('BLENDER-v300RENDh');
+    const asset = importarAsset('assets/modelos/heroi.blend', blend);
+    expect(asset.tipo).toBe('modelo');
+    expect(() => importarAsset('assets/modelos/heroi.blend', bytes('nao-e-um-blend'))).toThrow(
+      /\.blend inválido/,
     );
   });
 

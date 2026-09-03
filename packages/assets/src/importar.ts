@@ -1,6 +1,10 @@
+import { validarAse } from './ase.ts';
+import { validarBlend } from './blend.ts';
 import { extensaoDe, formatoDe } from './formatos.ts';
 import { validarGlb } from './glb.ts';
+import { validarGltfTexto } from './gltf.ts';
 import { hashBytes } from './hash.ts';
+import { validarTmx } from './tmx.ts';
 import { type AssetKind, type AssetMeta } from './tipos.ts';
 
 export interface OpcoesImportar {
@@ -40,9 +44,13 @@ export function importarAsset(
     );
   }
 
-  // GLB tem estrutura de verdade para conferir (assinatura, blocos) — os
-  // outros formatos suportados ainda sao aceitos so pela extensao.
+  // Cada formato suportado tem uma checagem estrutural propria (assinatura,
+  // cabecalho ou tag raiz) — ver o modulo de cada um.
   if (extensao === 'glb') validarGlb(bytes);
+  else if (extensao === 'gltf') validarGltfTexto(bytes);
+  else if (extensao === 'tmx') validarTmx(bytes);
+  else if (extensao === 'ase' || extensao === 'aseprite') validarAse(bytes);
+  else if (extensao === 'blend') validarBlend(bytes);
 
   const agora = opcoes.agora ?? Date.now;
   return {

@@ -3,14 +3,13 @@ import { type AssetKind } from './tipos.ts';
 /**
  * Os seis formatos da secao 11 do plano, e o que cada extensao vira.
  *
- * `suportado: false` existe de proposito: a peca reconhece que aquele
- * arquivo e um asset da Faisca, so ainda nao sabe le-lo. Isso separa dois
- * erros bem diferentes para quem arrastou o arquivo — "esse formato nao
- * existe aqui" contra "esse formato ainda esta por vir" — e da um lugar
- * obvio para plugar cada importador que faltar (glTF, Blender, Tiled,
- * Aseprite) sem mexer no resto do pipeline. GLB (glTF binario) ja saiu
- * dessa lista: `validarGlb` em `glb.ts` confere a assinatura antes de
- * aceitar.
+ * Todos os seis ja tem validacao estrutural real (assinatura, cabecalho ou
+ * tag raiz — ver `glb.ts`, `gltf.ts`, `blend.ts`, `tmx.ts`, `ase.ts`), nao
+ * so reconhecimento de extensao. `suportado: false` continua existindo
+ * como campo — e o lugar obvio para um formato novo que entre reconhecido
+ * mas sem leitura ainda, separando "esse formato nao existe aqui" de "esse
+ * formato ainda esta por vir" — so que nenhum dos seis atuais usa mais
+ * esse caminho.
  */
 interface FormatoInfo {
   tipo: AssetKind;
@@ -21,12 +20,12 @@ const FORMATOS: Record<string, FormatoInfo> = {
   png: { tipo: 'textura', suportado: true },
   wav: { tipo: 'som', suportado: true },
   ogg: { tipo: 'som', suportado: true },
-  gltf: { tipo: 'modelo', suportado: false },
+  gltf: { tipo: 'modelo', suportado: true },
   glb: { tipo: 'modelo', suportado: true },
-  blend: { tipo: 'modelo', suportado: false },
-  tmx: { tipo: 'modelo', suportado: false },
-  ase: { tipo: 'textura', suportado: false },
-  aseprite: { tipo: 'textura', suportado: false },
+  blend: { tipo: 'modelo', suportado: true },
+  tmx: { tipo: 'modelo', suportado: true },
+  ase: { tipo: 'textura', suportado: true },
+  aseprite: { tipo: 'textura', suportado: true },
 };
 
 /** Extensao do caminho, em minusculas e sem o ponto. `''` se nao houver. */

@@ -495,6 +495,35 @@ M9 editor de interface e menus · M10 diálogos e cutscenes · M11 publicar link
 > inspetor, o campo "Depois desta fala" some quando o passo tem opções:
 > mostrar os dois prometeria um caminho que a máquina nunca segue.
 
+> **Sobre a M12 (duas fatias entregues).** O Modo Criança sai da lista de
+> perfis e passa a ser escolhível. Ele **não é um segundo editor**: mostra
+> exatamente o que o perfil Design mostra, e o que muda é o *jeito*. Por isso
+> `PerfilSpec` ganhou um segundo objeto ao lado de `mostra`: `JeitoPerfil`
+> (`botoesGrandes`, `narracao`, `confirmaApagar`). Manter os dois separados
+> evita o erro de transformar "botão grande" em mais um painel que aparece e
+> some — "o que aparece" e "de que jeito aparece" são perguntas diferentes, e
+> os outros três perfis compartilham um mesmo jeito comum.
+>
+> A narração está cortada como a interface da M9: `Narrador`, em
+> `@faisca/autoria`, decide **o que dizer e quando calar** e não sabe de
+> navegador nenhum — dá para testá-lo inteiro sem uma janela; `VozDoNavegador`,
+> no editor, é a casca de dez linhas em cima de `speechSynthesis`, sem teste,
+> pelo mesmo motivo que `UiRenderer` e `GameHud` não têm. Duas regras valem
+> tudo: fala nova cala a anterior (uma fila de frases atrasadas descreveria o
+> botão que o dedo já largou) e ele não repete o que acabou de dizer, para
+> passar o mouse duas vezes pelo mesmo botão não virar eco. Quem escuta é um
+> único ouvinte de captura em `document` (`pointerover` e `focusin`), como o
+> `UiRenderer.onClique`: painel novo já nasce narrado, e quem anda de teclado
+> ouve o mesmo que quem anda de dedo. Se o navegador não tiver voz, o Modo
+> Criança continua funcionando calado.
+>
+> `confirmaApagar` faz `deleteSelection`, `removeTelaSelection`,
+> `removePassoSelection` e `novaFase` perguntarem antes — e **só** neste
+> perfil: para quem tem `Ctrl+Z` na mão, confirmar tudo é atrito, não
+> segurança. Se o `confirm` do navegador não existir ou estiver bloqueado, a
+> ação passa; travar o editor seria pior que apagar uma peça. Nada disso sai
+> da máquina: a voz é a do sistema, e continua valendo o zero telemetria.
+
 ### Depois
 Co-op local em tela dividida · nuvem e colaboração ao vivo · nós/grafo · Android · assistente de IA · online privado · 2D completo com tilemap · WebGPU como padrão quando o hardware permitir.
 

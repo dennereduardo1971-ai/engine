@@ -46,12 +46,18 @@ describe('perfis de interface', () => {
     expect(Object.values(tudo).every(Boolean)).toBe(true);
   });
 
-  it('o Modo Criança aparece na lista, mas ainda não dá para escolher', () => {
-    const crianca = PERFIS.find((perfil) => perfil.id === 'crianca')!;
-    expect(crianca.disponivel).toBe(false);
-    // Escolher um perfil que ainda nao existe cai no padrao, em vez de abrir
-    // uma tela pela metade.
-    expect(perfilValido('crianca')).toBe(PERFIL_PADRAO);
+  it('o Modo Criança já dá para escolher, e é o único com jeito próprio (M12)', () => {
+    const crianca = acharPerfil('crianca');
+    expect(crianca.disponivel).toBe(true);
+    expect(perfilValido('crianca')).toBe('crianca');
+    expect(crianca.jeito).toEqual({ botoesGrandes: true, narracao: true, confirmaApagar: true });
+
+    // "O que aparece" e "de que jeito" sao perguntas separadas: o Modo Crianca
+    // mostra exatamente o mesmo que o Design, e mesmo assim e outra interface.
+    expect(crianca.mostra).toEqual(acharPerfil('design').mostra);
+    for (const outro of PERFIS.filter((perfil) => perfil.id !== 'crianca')) {
+      expect(Object.values(outro.jeito).some(Boolean)).toBe(false);
+    }
   });
 
   it('perfil salvo que nao existe mais nao quebra o editor', () => {

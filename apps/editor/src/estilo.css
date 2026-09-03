@@ -823,3 +823,44 @@ select {
   width: auto;
   margin-top: 8px;
 }
+
+/* --- Modo Criança (M12) ---------------------------------------------------
+ *
+ * Um perfil não é um segundo editor: é a mesma tela com outro tamanho de
+ * dedo. Por isso "botão grande" é uma classe na raiz e algumas regras de
+ * medida, e não um conjunto de painéis diferentes — o que aparece continua
+ * sendo decidido por `mostra`, e só o *jeito* muda aqui. */
+
+.app.grande {
+  font-size: 16px;
+}
+
+.app.grande button,
+.app.grande select,
+.app.grande input {
+  min-height: 40px;
+  padding: 8px 14px;
+  font-size: 16px;
+  border-radius: calc(var(--raio) * 1.5);
+}
+
+.app.grande .barra {
+  min-height: 60px;
+  gap: 14px;
+}
+
+.app.grande .barra .marca {
+  font-size: 26px;
+}
+
+.app.grande .lado {
+  width: 300px;
+  min-width: 300px;
+}
+
+/* O foco precisa ser visível de longe: quem navega por teclado ou por toque
+ * grande é justamente quem menos enxerga o contorno fininho do padrão. */
+.app.grande :focus-visible {
+  outline: 3px solid var(--marca);
+  outline-offset: 2px;
+}

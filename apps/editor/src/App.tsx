@@ -59,7 +59,7 @@ export function App() {
   }, [editor]);
 
   return (
-    <div className="app">
+    <div className={editor?.jeito.botoesGrandes ? 'app grande' : 'app'}>
       {editor ? <Barra editor={editor} /> : <header className="barra" />}
       <div className="corpo">
         <aside className="lado esquerda">

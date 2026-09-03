@@ -79,10 +79,13 @@ export {
   PERFIL_PADRAO,
   PERFIS,
   perfilValido,
+  type JeitoPerfil,
   type MostraPerfil,
   type Perfil,
   type PerfilSpec,
 } from './perfis.ts';
+
+export { Narrador, narracaoDoControle, type NarradorOptions, type Voz } from './narracao.ts';
 
 export { History, type HistoryOptions } from './historico.ts';
 

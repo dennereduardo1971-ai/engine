@@ -43,6 +43,8 @@ import {
   findPiece,
   History,
   localFromWorld,
+  Narrador,
+  narracaoDoControle,
   type Perfil,
   type PerfilSpec,
   perfilValido,
@@ -54,6 +56,7 @@ import {
   worldPlacement,
   writeScene,
 } from '@faisca/autoria';
+import { VozDoNavegador } from './voz.ts';
 import { Viewport } from './viewport.ts';
 
 /**
@@ -174,6 +177,13 @@ export class Editor {
    * do trabalho não pode mexer no projeto de ninguém.
    */
   perfil: Perfil = perfilValido(lerPerfilSalvo());
+  /**
+   * A narração do Modo Criança (M12).
+   *
+   * Ele nasce calado e só ganha voz quando o perfil pede: quem escolheu
+   * Programador não quer o computador falando por cima dele.
+   */
+  readonly narrador = new Narrador();
 
   private readonly listeners = new Set<() => void>();
   /**
@@ -188,6 +198,8 @@ export class Editor {
   private salvarTelaPendente: ReturnType<typeof setTimeout> | null = null;
   private salvarConversaPendente: ReturnType<typeof setTimeout> | null = null;
   private avisoPendente = 0;
+  /** O ouvinte único que narra o controle sob o dedo. `null` quando calado. */
+  private ouvindoControles: ((event: Event) => void) | null = null;
   /** Onde o HUD do jogo e a tela do jogador moram. */
   private readonly palco: HTMLElement;
   /** A tela de verdade, em DOM. Só existe durante o teste. */
@@ -306,6 +318,9 @@ export class Editor {
       this.notify();
     });
 
+    // O perfil guardado ja vale na abertura: quem escolheu Modo Crianca ontem
+    // nao precisa escolher de novo para o editor voltar a falar.
+    this.aplicarJeito();
     this.abrirSalvo();
     this.abrirTelaSalva();
     this.abrirConversaSalva();
@@ -346,6 +361,11 @@ export class Editor {
     return acharPerfil(this.perfil).mostra;
   }
 
+  /** De que jeito ele mostra: botão grande, voz, pergunta antes de apagar. */
+  get jeito(): PerfilSpec['jeito'] {
+    return acharPerfil(this.perfil).jeito;
+  }
+
   setPerfil(perfil: Perfil): void {
     if (this.perfil === perfil) return;
     this.perfil = perfilValido(perfil);
@@ -361,7 +381,66 @@ export class Editor {
     if (!this.mostra.regras && !this.mostra.blocos && !this.mostra.codigo) {
       this.scriptAberto = false;
     }
+    this.aplicarJeito();
     this.aviso(`Perfil ${acharPerfil(this.perfil).label}.`);
+  }
+
+  // --- Modo Criança (M12) ---------------------------------------------------
+  //
+  // O perfil já dizia o que aparece; aqui ele passa a dizer de que jeito. As
+  // três coisas que a seção 13 pede — botão grande, narração e confirmação —
+  // não viram um segundo editor: são um `class` a mais no `<div class="app">`,
+  // um ouvinte só e uma pergunta antes de apagar, todos em cima do mesmo miolo.
+
+  /**
+   * Liga ou desliga a voz conforme o perfil de agora.
+   *
+   * A narração é um ouvinte **único**, na raiz, e não um `onMouseOver` por
+   * botão: o mesmo corte que o `UiRenderer.onClique` da M9 fez. Assim nenhum
+   * painel do editor precisa saber que existe narração, e um botão novo já
+   * nasce narrado.
+   */
+  private aplicarJeito(): void {
+    const quer = this.jeito.narracao && VozDoNavegador.disponivel();
+    this.narrador.setLigado(quer);
+    this.narrador.usarVoz(quer ? new VozDoNavegador() : null);
+
+    if (quer && !this.ouvindoControles) {
+      const ouvinte = (event: Event) => this.narrarControle(event.target);
+      // `pointerover` para o dedo e o mouse; `focusin` para o teclado — quem
+      // navega por Tab merece ouvir a mesma coisa que quem aponta.
+      document.addEventListener('pointerover', ouvinte, true);
+      document.addEventListener('focusin', ouvinte, true);
+      this.ouvindoControles = ouvinte;
+    } else if (!quer && this.ouvindoControles) {
+      document.removeEventListener('pointerover', this.ouvindoControles, true);
+      document.removeEventListener('focusin', this.ouvindoControles, true);
+      this.ouvindoControles = null;
+    }
+  }
+
+  /** Narra o controle sob o alvo, se houver um. Não fala do que não é botão. */
+  private narrarControle(alvo: EventTarget | null): void {
+    if (!(alvo instanceof Element)) return;
+    const controle = alvo.closest('button, select, input, a, label, [role="button"]');
+    if (!controle) return;
+    const rotulo = controle.getAttribute('aria-label') ?? controle.textContent ?? '';
+    this.narrador.falar(narracaoDoControle(rotulo, controle.getAttribute('title') ?? ''));
+  }
+
+  /**
+   * Pergunta antes de apagar, quando o perfil pede.
+   *
+   * Fora do Modo Criança devolve `true` na hora: confirmar tudo para quem tem
+   * `Ctrl+Z` na mão seria atrito, e não segurança. Navegador sem `confirm`
+   * (ou que o bloqueou) também deixa passar — travar o editor seria pior que
+   * apagar uma peça que dá para desfazer.
+   */
+  private confirmar(pergunta: string): boolean {
+    if (!this.jeito.confirmaApagar) return true;
+    this.narrador.falar(pergunta, true);
+    if (typeof globalThis.confirm !== 'function') return true;
+    return globalThis.confirm(pergunta);
   }
 
   // --- Assets -----------------------------------------------------------
@@ -692,6 +771,7 @@ export class Editor {
   deleteSelection(): void {
     const node = this.selectedNode;
     if (!node) return;
+    if (!this.confirmar(`Apagar ${node.name}?`)) return;
     this.history.record(`apagar ${node.name}`);
     this.document.remove(node.id);
     this.select(null);
@@ -724,6 +804,7 @@ export class Editor {
   removeTelaSelection(): void {
     const node = this.selectedTelaNode;
     if (!node) return;
+    if (!this.confirmar(`Tirar ${node.name} da tela?`)) return;
     this.tela.remove(node.id);
     this.selectTela(null);
   }
@@ -830,6 +911,7 @@ export class Editor {
   removePassoSelection(): void {
     const passo = this.selectedPasso;
     if (!passo) return;
+    if (!this.confirmar('Apagar esta fala?')) return;
     this.conversa.remove(passo.id);
     this.selectPasso(null);
   }
@@ -1125,6 +1207,7 @@ export class Editor {
   // --- Arquivo --------------------------------------------------------------
 
   novaFase(): void {
+    if (!this.confirmar('Começar uma fase nova? A de agora sai da tela.')) return;
     this.history.record('nova fase');
     this.document.load({ format: '0.1', name: 'Fase nova', nodes: [] });
     this.select(null);
@@ -1225,6 +1308,15 @@ export class Editor {
     this.salvarTelaPendente = null;
     if (this.salvarConversaPendente) clearTimeout(this.salvarConversaPendente);
     this.salvarConversaPendente = null;
+    // O ouvinte de narração é o único que o editor pendura fora do seu próprio
+    // DOM: se ele sobrevivesse ao editor, o próximo falaria em dobro.
+    this.narrador.setLigado(false);
+    this.narrador.usarVoz(null);
+    if (this.ouvindoControles) {
+      document.removeEventListener('pointerover', this.ouvindoControles, true);
+      document.removeEventListener('focusin', this.ouvindoControles, true);
+      this.ouvindoControles = null;
+    }
     this.desmontarTela();
     this.viewport.dispose();
     this.assembler.dispose();
@@ -1343,6 +1435,9 @@ export class Editor {
 
   private aviso(texto: string): void {
     this.message = texto;
+    // O recado da barra é a única coisa que o editor diz por conta própria, e
+    // é justamente o que uma criança não vai ler no canto da tela.
+    this.narrador.falar(texto, true);
     const meu = ++this.avisoPendente;
     this.notify();
     setTimeout(() => {

@@ -30,6 +30,24 @@ export interface MostraPerfil {
   performance: boolean;
 }
 
+/**
+ * Como o perfil se comporta — a M12, e nao a secao 8.
+ *
+ * `MostraPerfil` responde "o que aparece"; isto responde "de que jeito". Sao
+ * duas perguntas diferentes de proposito: o Modo Crianca mostra exatamente o
+ * mesmo que o Design (regras sim, blocos e codigo nao), e mesmo assim e outra
+ * interface. Se as duas coisas morassem no mesmo objeto, "botao grande" viraria
+ * mais um painel que aparece ou some.
+ */
+export interface JeitoPerfil {
+  /** Alvos de clique grandes e icone antes do rotulo. */
+  botoesGrandes: boolean;
+  /** Narracao por voz dos menus e dos avisos. */
+  narracao: boolean;
+  /** Pergunta antes de qualquer coisa que apaga. */
+  confirmaApagar: boolean;
+}
+
 export interface PerfilSpec {
   id: Perfil;
   label: string;
@@ -40,14 +58,25 @@ export interface PerfilSpec {
   /**
    * Da para escolher ele hoje?
    *
-   * O Modo Crianca e a M12: ele precisa de botoes grandes, narracao por voz e
-   * confirmacao em tudo que apaga, e nada disso e casca fina. Ele aparece na
-   * lista desligado, e nao some dela — quem abre o editor merece saber que ele
-   * esta no caminho.
+   * O campo continua existindo depois da M12, que ligou o Modo Crianca: ele e
+   * o lugar onde um perfil novo entra na lista antes de existir de verdade,
+   * porque quem abre o editor merece saber o que esta no caminho.
    */
   disponivel: boolean;
   mostra: MostraPerfil;
+  jeito: JeitoPerfil;
 }
+
+/**
+ * O jeito de quem ja sabe usar um computador: sem voz, sem botao grande e sem
+ * pergunta antes de apagar. Confirmar tudo para quem tem `Ctrl+Z` na mao seria
+ * atrito, e nao seguranca.
+ */
+const JEITO_COMUM: JeitoPerfil = {
+  botoesGrandes: false,
+  narracao: false,
+  confirmaApagar: false,
+};
 
 export const PERFIS: readonly PerfilSpec[] = [
   {
@@ -55,9 +84,10 @@ export const PERFIS: readonly PerfilSpec[] = [
     label: 'Criança',
     icone: '🧒',
     para: 'o filho',
-    resumo: 'Botões grandes, ícones e narração por voz. Chega na M12.',
-    disponivel: false,
+    resumo: 'Botões grandes, ícones e narração por voz. Pergunta antes de apagar.',
+    disponivel: true,
     mostra: { regras: true, blocos: false, codigo: false, depuracao: false, performance: false },
+    jeito: { botoesGrandes: true, narracao: true, confirmaApagar: true },
   },
   {
     id: 'design',
@@ -67,6 +97,7 @@ export const PERFIS: readonly PerfilSpec[] = [
     resumo: 'Cena, peças, cores e regras de "quando isso, faça aquilo". Zero código visível.',
     disponivel: true,
     mostra: { regras: true, blocos: false, codigo: false, depuracao: false, performance: false },
+    jeito: JEITO_COMUM,
   },
   {
     id: 'criador',
@@ -76,6 +107,7 @@ export const PERFIS: readonly PerfilSpec[] = [
     resumo: 'Tudo do Design, mais os blocos e o passo-a-passo do teste.',
     disponivel: true,
     mostra: { regras: true, blocos: true, codigo: false, depuracao: true, performance: false },
+    jeito: JEITO_COMUM,
   },
   {
     id: 'programador',
@@ -85,6 +117,7 @@ export const PERFIS: readonly PerfilSpec[] = [
     resumo: 'Tudo, mais o código do script e o painel de performance.',
     disponivel: true,
     mostra: { regras: true, blocos: true, codigo: true, depuracao: true, performance: true },
+    jeito: JEITO_COMUM,
   },
 ];
 

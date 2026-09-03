@@ -446,6 +446,55 @@ M9 editor de interface e menus · M10 diálogos e cutscenes · M11 publicar link
 >   copiar a tela para dentro de cada fase. Abrir um `.ui` solta as ligações
 >   de campo vivo — os nós carregados são outros nós.
 
+> **Sobre a M10 (três fatias entregues).** Mesma receita da M8 e da M9: o
+> pacote puro primeiro, o editor depois. `@faisca/dialogo` nasce sem nenhuma
+> dependência — não conhece DOM, não conhece `@faisca/runtime` e não sabe
+> desenhar balão nenhum, exatamente como `@faisca/interface`.
+>
+> A primeira fatia é a conversa como documento (`documento.ts`): uma lista de
+> passos ligados por id, onde **um passo é sempre uma fala**. Se ele tiver
+> opções, a fala é uma pergunta e o jogador escolhe; se não tiver, ele segue
+> para `proxima`. Não existe "nó de escolha" separado do "nó de fala" de
+> propósito: no jogo a pergunta *é* um balão, e separar os dois obrigaria a
+> montar dois nós para dizer uma frase só. As mutações são pequenas e avisam o
+> que mudou (`add`, `remove`, `texto`, `ligacao`, `opcoes`, `nome`, `reload`),
+> para o painel corrigir uma linha em vez de remontar a lista a cada tecla.
+> Acrescentar uma fala liga automaticamente a anterior a ela — quem escreve
+> conversa escreve de cima para baixo, e ligar cada linha à mão seria trabalho
+> de digitação, não de autoria. Apagar um passo deixa quem apontava para ele
+> apontando para o nada, e não para um id fantasma: uma conversa que termina é
+> melhor que uma que trava. Sem `History`/desfazer, mesma decisão que a M8
+> tomou para o catálogo de assets e a M9 para o documento de tela.
+>
+> A segunda fatia é o que percorre isso em tempo de jogo. `Conversando`
+> (`maquina.ts`) recebe uma *cópia* do documento e nunca o modifica: ensaiar
+> uma conversa no editor não pode deixar rastro no que foi escrito. Ela expõe
+> o `balao` de agora (quem, texto, opções), `avancar()` — que devolve `false`
+> numa pergunta, para o balão esperar em vez de engolir a resposta —,
+> `escolher(indice)` e `reiniciar()`. A cutscene (`cutscene.ts`) é a outra
+> metade da seção 10: uma linha do tempo de ações com início e duração
+> (`falar`, `camera`, `mover`, `esperar`, `fazer`), tocada por `Rodando` com
+> `avancar(dt)`, `irPara(t)` — para arrastar a agulha no editor — e `pular()`.
+> Ela devolve *o que está ativo agora* e os acontecimentos da fatia de tempo,
+> em vez de chamar callbacks: quem toca a cutscene decide o que fazer com uma
+> `camera` ou um `mover`, e o pacote continua sem saber o que é uma câmera.
+> O formato `.dialogo`/`.cutscene` (`formato.ts`) grava texto legível com
+> comentário de cabeçalho, no mesmo corte do `.cena` e do `.ui`.
+>
+> A terceira fatia é o painel "Conversa" no editor
+> (`apps/editor/src/ui/Conversas.tsx`), plumbing idêntico ao do `.ui`: chave
+> própria em `localStorage` (`faisca:fase-01.dialogo`, atraso de 500 ms),
+> Baixar/Abrir, e métodos de mutação na mesma classe `Editor`. O que faz a
+> M10 valer no editor é o **ensaio**: escrever fala e escolha sem poder ouvir
+> a conversa é escrever no escuro. `ensaiar(daSelecao)` pode começar do passo
+> selecionado, para quem está conferindo o terceiro ramo de uma escolha não
+> reproduzir tudo de novo; sair do modo jogar ou abrir outro arquivo mata o
+> ensaio em curso. O balão desenhado é JSX do editor, e não do pacote: o
+> `@faisca/dialogo` diz *o que está sendo dito*, e desenhar é decisão de quem
+> mostra — no jogo publicado o mesmo balão sai da camada de tela da M9. No
+> inspetor, o campo "Depois desta fala" some quando o passo tem opções:
+> mostrar os dois prometeria um caminho que a máquina nunca segue.
+
 ### Depois
 Co-op local em tela dividida · nuvem e colaboração ao vivo · nós/grafo · Android · assistente de IA · online privado · 2D completo com tilemap · WebGPU como padrão quando o hardware permitir.
 

@@ -3,6 +3,7 @@ import { Editor } from './editor.ts';
 import { Arvore } from './ui/Arvore.tsx';
 import { Assets } from './ui/Assets.tsx';
 import { Barra } from './ui/Barra.tsx';
+import { BalaoDaConversa, Conversas } from './ui/Conversas.tsx';
 import { Inspetor } from './ui/Inspetor.tsx';
 import { Pecas } from './ui/Pecas.tsx';
 import { Pista } from './ui/Pista.tsx';
@@ -69,6 +70,7 @@ export function App() {
               <Assets editor={editor} />
               <Arvore editor={editor} />
               <Telas editor={editor} />
+              <Conversas editor={editor} />
             </>
           ) : null}
         </aside>
@@ -76,6 +78,7 @@ export function App() {
         <div className="palco" ref={palco}>
           <canvas ref={canvas} />
           {editor ? <Programar editor={editor} /> : null}
+          {editor ? <BalaoDaConversa editor={editor} /> : null}
           <div className="teclas">
             <b>botão esquerdo</b> seleciona e arrasta · <b>direito</b> gira a câmera ·{' '}
             <b>meio</b> arrasta a vista · <b>roda</b> aproxima · <b>R</b> gira 45° ·{' '}

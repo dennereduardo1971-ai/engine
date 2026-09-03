@@ -1,0 +1,11 @@
+{
+  "name": "@faisca/dialogo",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Camada de dialogo da Faisca: conversas com balao de fala, escolhas e cutscenes",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

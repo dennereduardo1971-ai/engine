@@ -779,3 +779,47 @@ select {
   color: #f0c674;
   opacity: 0.85;
 }
+
+/* O balão de fala do ensaio (M10). Ele fica por cima do palco, em baixo e no
+   meio, que é onde um balão de jogo fica — o painel de conversa está do lado,
+   mas ouvir a conversa tem que acontecer olhando para a cena. */
+.palco .balao {
+  position: absolute;
+  left: 50%;
+  bottom: 44px;
+  transform: translateX(-50%);
+  width: min(520px, calc(100% - 48px));
+  padding: 12px 14px;
+  border-radius: var(--raio);
+  background: rgba(14, 17, 23, 0.92);
+  border: 1px solid var(--borda);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+
+.palco .balao .quem {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--marca);
+  font-size: 12px;
+}
+
+.palco .balao .fala {
+  margin: 0 0 10px;
+  line-height: 1.4;
+}
+
+.palco .balao .escolhas {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.palco .balao button {
+  width: 100%;
+  text-align: left;
+}
+
+.palco .balao .link {
+  width: auto;
+  margin-top: 8px;
+}

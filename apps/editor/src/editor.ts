@@ -30,6 +30,14 @@ import {
   writeInterface,
 } from '@faisca/interface';
 import {
+  Conversa,
+  Conversando,
+  readDialogo,
+  writeDialogo,
+  type Balao,
+  type Passo,
+} from '@faisca/dialogo';
+import {
   acharPerfil,
   faseDeExemplo,
   findPiece,
@@ -66,6 +74,7 @@ export type EditorMode = 'editar' | 'jogar';
 
 const CHAVE_LOCAL = 'faisca:fase-01.cena';
 const CHAVE_TELA = 'faisca:fase-01.ui';
+const CHAVE_CONVERSA = 'faisca:fase-01.dialogo';
 const CHAVE_PERFIL = 'faisca:perfil';
 
 /**
@@ -120,10 +129,27 @@ export class Editor {
    * quadro pelo sistema `TelaViva` (fase 'render').
    */
   readonly camposVivos = new CamposVivos(this.tela);
+  /**
+   * A conversa sendo escrita (M10). Uma conversa por projeto, como a tela:
+   * o `.dialogo` é um arquivo à parte do `.cena` pelo mesmo motivo — quem
+   * tem duas fases e um diálogo só não deveria copiá-lo para dentro de cada
+   * fase.
+   */
+  readonly conversa = new Conversa('Conversa 1');
+  /**
+   * A conversa rodando agora, no ensaio.
+   *
+   * Ela é uma cópia do documento (`Conversando` nunca mexe no que leu), e é
+   * por isso que dá para ensaiar no meio da escrita sem medo: parar, mudar a
+   * fala e ensaiar de novo não deixa rastro no arquivo.
+   */
+  conversando: Conversando | null = null;
 
   selection: string | null = null;
   /** No selecionado na arvore da tela (`tela`), independente de `selection`. */
   telaSelection: string | null = null;
+  /** Fala selecionada no painel Conversa. */
+  passoSelection: string | null = null;
   /** Peca escolhida no painel: com ela na mao, clicar no chao coloca uma. */
   brush: string | null = null;
   /**
@@ -160,6 +186,7 @@ export class Editor {
   private estadoAnterior: string = 'jogando';
   private salvarPendente: ReturnType<typeof setTimeout> | null = null;
   private salvarTelaPendente: ReturnType<typeof setTimeout> | null = null;
+  private salvarConversaPendente: ReturnType<typeof setTimeout> | null = null;
   private avisoPendente = 0;
   /** Onde o HUD do jogo e a tela do jogador moram. */
   private readonly palco: HTMLElement;
@@ -274,9 +301,14 @@ export class Editor {
       this.agendarSalvarTela();
       this.notify();
     });
+    this.conversa.escutar(() => {
+      this.agendarSalvarConversa();
+      this.notify();
+    });
 
     this.abrirSalvo();
     this.abrirTelaSalva();
+    this.abrirConversaSalva();
     this.assembler.build();
     this.engine.start();
   }
@@ -294,6 +326,15 @@ export class Editor {
 
   get selectedTelaNode(): UiNode | null {
     return this.tela.get(this.telaSelection);
+  }
+
+  get selectedPasso(): Passo | null {
+    return this.conversa.achar(this.passoSelection);
+  }
+
+  /** O balão de agora, ou `null` quando ninguém está falando. */
+  get balao(): Balao | null {
+    return this.conversando?.balao ?? null;
   }
 
   get paused(): boolean {
@@ -768,6 +809,165 @@ export class Editor {
     return clamp01(heroi.speed / heroi.maxSpeed);
   }
 
+  // --- Conversa (M10, fatia 3) ----------------------------------------------
+  //
+  // Mesma disciplina da tela: sem `history.record`. O documento de conversa
+  // também não tem desfazer, e o painel não pode fingir que tem.
+  //
+  // O ensaio (`ensaiar`) é o que faz a M10 valer no editor: escrever fala e
+  // escolha sem poder ouvir a conversa é escrever no escuro.
+
+  selectPasso(id: string | null): void {
+    this.passoSelection = id;
+    this.notify();
+  }
+
+  addPasso(): void {
+    const passo = this.conversa.add('', '');
+    this.selectPasso(passo.id);
+  }
+
+  removePassoSelection(): void {
+    const passo = this.selectedPasso;
+    if (!passo) return;
+    this.conversa.remove(passo.id);
+    this.selectPasso(null);
+  }
+
+  setPassoFala(quem: string, texto: string): void {
+    const passo = this.selectedPasso;
+    if (!passo) return;
+    this.conversa.setTexto(passo.id, quem, texto);
+  }
+
+  setPassoProxima(proxima: string | null): void {
+    const passo = this.selectedPasso;
+    if (!passo) return;
+    this.conversa.setProxima(passo.id, proxima);
+  }
+
+  addOpcao(): void {
+    const passo = this.selectedPasso;
+    if (!passo) return;
+    this.conversa.addOpcao(passo.id, 'Escolha');
+  }
+
+  setOpcao(indice: number, texto: string, destino: string | null): void {
+    const passo = this.selectedPasso;
+    if (!passo) return;
+    this.conversa.setOpcao(passo.id, indice, texto, destino);
+  }
+
+  removeOpcao(indice: number): void {
+    const passo = this.selectedPasso;
+    if (!passo) return;
+    this.conversa.removeOpcao(passo.id, indice);
+  }
+
+  renomearConversa(name: string): void {
+    this.conversa.renomear(name);
+  }
+
+  /**
+   * Começa o ensaio da conversa, da primeira fala ou da fala selecionada.
+   *
+   * Ensaiar do meio é de propósito: quem está escrevendo o terceiro ramo de
+   * uma escolha não deveria ter que clicar a conversa inteira de novo para
+   * ver como ele soa.
+   */
+  ensaiar(daSelecao = false): void {
+    if (this.conversa.lista.length === 0) {
+      this.aviso('A conversa está vazia. Escreva uma fala para poder ensaiar.');
+      return;
+    }
+    this.conversando = new Conversando(
+      this.conversa.toData(),
+      daSelecao ? this.passoSelection : null,
+    );
+    this.notify();
+  }
+
+  avancarConversa(): void {
+    if (!this.conversando) return;
+    // `avancar` recusa numa pergunta, e é isso que queremos: o balão fica na
+    // tela esperando a escolha em vez de comer a resposta de quem joga.
+    if (!this.conversando.avancar()) return;
+    if (this.conversando.terminou) this.pararConversa('Fim da conversa.');
+    else this.notify();
+  }
+
+  escolherOpcao(indice: number): void {
+    if (!this.conversando) return;
+    if (!this.conversando.escolher(indice)) return;
+    if (this.conversando.terminou) this.pararConversa('Fim da conversa.');
+    else this.notify();
+  }
+
+  pararConversa(recado?: string): void {
+    this.conversando = null;
+    if (recado) this.aviso(recado);
+    else this.notify();
+  }
+
+  // --- Arquivo da conversa (`.dialogo`) -------------------------------------
+
+  /** O texto do arquivo `.dialogo`, do jeito que ele vai para o disco. */
+  textoConversa(): string {
+    return writeDialogo(this.conversa.toData());
+  }
+
+  exportarConversa(): void {
+    const blob = new Blob([this.textoConversa()], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = window.document.createElement('a');
+    link.href = url;
+    link.download = `${slug(this.conversa.name, 'conversa')}.dialogo`;
+    link.click();
+    URL.revokeObjectURL(url);
+    this.aviso('Conversa baixada.');
+  }
+
+  importarConversa(texto: string): void {
+    try {
+      const dados = readDialogo(texto);
+      this.conversa.load(dados);
+      // As falas que estavam na tela são de outra conversa: manter o ensaio
+      // rodando mostraria um balão que não existe mais.
+      this.conversando = null;
+      this.selectPasso(null);
+      this.aviso(`Conversa "${dados.name}" carregada.`);
+    } catch (erro) {
+      this.aviso(erro instanceof Error ? erro.message : 'Não consegui ler este arquivo de conversa.');
+    }
+  }
+
+  private abrirConversaSalva(): void {
+    let texto: string | null = null;
+    try {
+      texto = localStorage.getItem(CHAVE_CONVERSA);
+    } catch {
+      texto = null;
+    }
+    if (!texto) return;
+    try {
+      this.conversa.load(readDialogo(texto));
+    } catch {
+      this.aviso('O rascunho da conversa estava quebrado; comecei uma conversa vazia.');
+    }
+  }
+
+  private agendarSalvarConversa(): void {
+    if (this.salvarConversaPendente) clearTimeout(this.salvarConversaPendente);
+    this.salvarConversaPendente = setTimeout(() => {
+      this.salvarConversaPendente = null;
+      try {
+        localStorage.setItem(CHAVE_CONVERSA, this.textoConversa());
+      } catch {
+        this.aviso('Não consegui salvar a conversa na máquina. Baixe o arquivo .dialogo.');
+      }
+    }, 500);
+  }
+
   undo(): void {
     if (this.history.undo()) {
       this.select(this.document.get(this.selection) ? this.selection : null);
@@ -819,6 +1019,7 @@ export class Editor {
 
   stop(): void {
     if (this.mode === 'editar') return;
+    this.conversando = null;
     this.hudJogo.element.hidden = true;
     this.desmontarTela();
     this.assembler.stopPlay();
@@ -1022,6 +1223,8 @@ export class Editor {
     this.salvarPendente = null;
     if (this.salvarTelaPendente) clearTimeout(this.salvarTelaPendente);
     this.salvarTelaPendente = null;
+    if (this.salvarConversaPendente) clearTimeout(this.salvarConversaPendente);
+    this.salvarConversaPendente = null;
     this.desmontarTela();
     this.viewport.dispose();
     this.assembler.dispose();

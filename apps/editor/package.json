@@ -15,6 +15,7 @@
     "@faisca/autoria": "*",
     "@faisca/blocos": "*",
     "@faisca/kit-brinquedos": "*",
+    "@faisca/interface": "*",
     "@faisca/kit-inicial": "*",
     "@faisca/kit-velocidade": "*",
     "@faisca/runtime": "*",

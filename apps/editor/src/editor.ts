@@ -18,6 +18,7 @@ import {
 import { patrollerSystem } from '@faisca/kit-inimigos';
 import { portaSystem } from '@faisca/kit-brinquedos';
 import { type Script } from '@faisca/blocos';
+import { type Ancora, type UiNode, UiDocument } from '@faisca/interface';
 import {
   acharPerfil,
   faseDeExemplo,
@@ -77,8 +78,16 @@ export class Editor {
    * projeto".
    */
   readonly catalogo = new CatalogoDeAssets();
+  /**
+   * A tela de interface sendo montada (M9, fatia 2). Uma só tela por
+   * projeto por enquanto — várias telas e o arquivo `.ui` no disco ficam
+   * para as próximas fatias.
+   */
+  readonly tela = new UiDocument('Tela 1');
 
   selection: string | null = null;
+  /** No selecionado na arvore da tela (`tela`), independente de `selection`. */
+  telaSelection: string | null = null;
   /** Peca escolhida no painel: com ela na mao, clicar no chao coloca uma. */
   brush: string | null = null;
   /**
@@ -205,6 +214,7 @@ export class Editor {
       this.agendarSalvar();
       this.notify();
     });
+    this.tela.on(() => this.notify());
 
     this.abrirSalvo();
     this.assembler.build();
@@ -220,6 +230,10 @@ export class Editor {
 
   get selectedNode(): SceneNode | null {
     return this.document.get(this.selection);
+  }
+
+  get selectedTelaNode(): UiNode | null {
+    return this.tela.get(this.telaSelection);
   }
 
   get paused(): boolean {
@@ -588,6 +602,59 @@ export class Editor {
     this.history.record(`duplicar ${node.name}`);
     const copia = this.document.duplicate(node.id, { x: this.grid || 2, y: 0, z: 0 });
     if (copia) this.select(copia.id);
+  }
+
+  // --- Tela de interface (M9, fatia 2) --------------------------------------
+  //
+  // Mesmo formato de método da cena 3D acima, mas sem `history.record`: a
+  // fatia 1 decidiu que o documento de tela não tem desfazer ainda, e essa
+  // decisão continua valendo para o painel do editor.
+
+  selectTela(id: string | null): void {
+    this.telaSelection = id;
+    this.notify();
+  }
+
+  addElemento(elemento: string): void {
+    const no = this.tela.add(elemento);
+    this.selectTela(no.id);
+  }
+
+  removeTelaSelection(): void {
+    const node = this.selectedTelaNode;
+    if (!node) return;
+    this.tela.remove(node.id);
+    this.selectTela(null);
+  }
+
+  renameTela(name: string): void {
+    const node = this.selectedTelaNode;
+    if (!node) return;
+    this.tela.rename(node.id, name);
+  }
+
+  setTelaAncora(ancora: Ancora): void {
+    const node = this.selectedTelaNode;
+    if (!node) return;
+    this.tela.setAncora(node.id, ancora, node.offsetX, node.offsetY);
+  }
+
+  setTelaOffset(offsetX: number, offsetY: number): void {
+    const node = this.selectedTelaNode;
+    if (!node) return;
+    this.tela.setOffset(node.id, offsetX, offsetY);
+  }
+
+  setTelaTexto(texto: string | null): void {
+    const node = this.selectedTelaNode;
+    if (!node) return;
+    this.tela.setTexto(node.id, texto);
+  }
+
+  setTelaCor(cor: number | null): void {
+    const node = this.selectedTelaNode;
+    if (!node) return;
+    this.tela.setCor(node.id, cor);
   }
 
   undo(): void {

@@ -7,6 +7,7 @@ import { Inspetor } from './ui/Inspetor.tsx';
 import { Pecas } from './ui/Pecas.tsx';
 import { Pista } from './ui/Pista.tsx';
 import { Programar } from './ui/Programar.tsx';
+import { Telas } from './ui/Telas.tsx';
 
 /**
  * O editor v0 da Faisca (M3).
@@ -67,6 +68,7 @@ export function App() {
               <Pecas editor={editor} />
               <Assets editor={editor} />
               <Arvore editor={editor} />
+              <Telas editor={editor} />
             </>
           ) : null}
         </aside>

@@ -373,7 +373,7 @@ M5 ✅ blocos ⇄ código · M6 ✅ gatilho-e-resposta e perfil Design · M7 ✅
 ### Mês 3 — Família
 M9 editor de interface e menus · M10 diálogos e cutscenes · M11 publicar link + galeria · M12 Modo Criança com narração
 
-> **Sobre a M9 (em andamento, fatia 1 entregue).** Mesma receita da M8: fatias
+> **Sobre a M9 (em andamento, fatia 2 entregue).** Mesma receita da M8: fatias
 > finas, começando pelo pacote-base puro e testável, sem UI. A primeira fatia
 > é `@faisca/interface`, análogo a `@faisca/autoria` mas para telas 2D em vez
 > de cenas 3D: um catálogo de elementos (`elementos.ts` — texto, botão,
@@ -384,12 +384,22 @@ M9 editor de interface e menus · M10 diálogos e cutscenes · M11 publicar link
 > o `.cena` já faz. Sem `History`/desfazer nesta fatia, mesma decisão que a
 > M8 tomou para o catálogo de assets.
 >
-> O que fica para as próximas fatias, por escolha explícita: o painel no
-> editor para montar uma tela arrastando; um sistema no runtime que
-> sincroniza `UiDocument` com elementos DOM de verdade (o que permitiria
-> aposentar o HUD hardcoded de `kit-velocidade/src/hud.ts`); o evento "quando
-> o botão for clicado" no catálogo de `@faisca/blocos`, para virar gatilho de
-> regra; e os "temas prontos" da seção 10.
+> A segunda fatia é o painel "Tela" no editor (`apps/editor/src/ui/Telas.tsx`):
+> a mesma classe `Editor` ganha um `UiDocument` (`editor.tela`) e métodos de
+> mutação no mesmo formato dos da cena 3D (`addElemento`, `selectTela`,
+> `setTelaAncora`, `setTelaOffset`, `setTelaTexto`, `setTelaCor`,
+> `removeTelaSelection`, `renameTela`) — sem `history.record`, porque a
+> decisão de não ter desfazer para o documento de tela, tomada na fatia 1,
+> continua valendo aqui. O painel reaproveita os componentes e o CSS que já
+> existem para a árvore de cena e o inspetor (grade de elementos, lista com
+> seleção, campos de âncora/deslocamento/texto/cor), sem estilo novo.
+>
+> O que fica para as próximas fatias, por escolha explícita: um sistema no
+> runtime que sincroniza `UiDocument` com elementos DOM de verdade (o que
+> permitiria aposentar o HUD hardcoded de `kit-velocidade/src/hud.ts`); o
+> evento "quando o botão for clicado" no catálogo de `@faisca/blocos`, para
+> virar gatilho de regra; os "temas prontos" da seção 10; e o arquivo `.ui`
+> de projeto lido/gravado no disco pelo editor.
 
 ### Depois
 Co-op local em tela dividida · nuvem e colaboração ao vivo · nós/grafo · Android · assistente de IA · online privado · 2D completo com tilemap · WebGPU como padrão quando o hardware permitir.

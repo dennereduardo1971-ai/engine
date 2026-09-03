@@ -310,6 +310,35 @@ button.link {
   flex: 1;
 }
 
+/* --- Assets ----------------------------------------------------------------- */
+
+.zona-de-soltar {
+  display: block;
+  padding: 10px;
+  border: 1px dashed var(--borda);
+  border-radius: var(--raio);
+  text-align: center;
+  font-size: 11px;
+  color: var(--apagado);
+  cursor: pointer;
+}
+
+.zona-de-soltar.sobre {
+  border-color: var(--marca);
+  color: var(--texto);
+  background: var(--painel-alto);
+}
+
+.assets-lista {
+  margin-top: 8px;
+  max-height: 30vh;
+  overflow-y: auto;
+}
+
+.assets .ramo {
+  cursor: default;
+}
+
 /* --- Arvore --------------------------------------------------------------- */
 
 .arvore .lista {

@@ -11,9 +11,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@faisca/assets": "*",
     "@faisca/autoria": "*",
     "@faisca/blocos": "*",
     "@faisca/kit-brinquedos": "*",
+    "@faisca/kit-inicial": "*",
     "@faisca/kit-velocidade": "*",
     "@faisca/runtime": "*",
     "react": "^19.2.0",

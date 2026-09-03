@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Editor } from './editor.ts';
 import { Arvore } from './ui/Arvore.tsx';
+import { Assets } from './ui/Assets.tsx';
 import { Barra } from './ui/Barra.tsx';
 import { Inspetor } from './ui/Inspetor.tsx';
 import { Pecas } from './ui/Pecas.tsx';
@@ -64,6 +65,7 @@ export function App() {
             <>
               <Pista editor={editor} />
               <Pecas editor={editor} />
+              <Assets editor={editor} />
               <Arvore editor={editor} />
             </>
           ) : null}

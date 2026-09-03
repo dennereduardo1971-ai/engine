@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { CatalogoDeAssets } from '@faisca/assets';
+import { kitInicial } from '@faisca/kit-inicial';
 import { Engine, PerfHud, SaveSlot, Transform, defineSystem } from '@faisca/runtime';
 import {
   followCameraSystem,
@@ -67,6 +69,14 @@ export class Editor {
   readonly partida = new Partida();
   /** Onde o personagem nasce e para onde ele volta ao cair. */
   readonly spawn = { x: 0, y: 0, z: 0, yaw: 0 };
+  /**
+   * O catálogo de assets (seção 11): o que já foi importado, com o kit
+   * inicial pré-instalado desde o primeiro uso. Arrastar um arquivo novo
+   * passa por `importarArquivos`, que usa o mesmo pipeline `@faisca/assets`
+   * — não existe um caminho separado para "assets do kit" e "assets do
+   * projeto".
+   */
+  readonly catalogo = new CatalogoDeAssets();
 
   selection: string | null = null;
   /** Peca escolhida no painel: com ela na mao, clicar no chao coloca uma. */
@@ -107,6 +117,10 @@ export class Editor {
   private avisoPendente = 0;
 
   constructor(canvas: HTMLCanvasElement, palco: HTMLElement) {
+    // O kit inicial já entra no catálogo: ninguém abre o editor de mãos
+    // vazias (seção 11 — "kit já instalado, sem precisar importar nada").
+    for (const { asset, bytes } of kitInicial()) this.catalogo.registrar(asset.caminho, bytes);
+
     this.engine = new Engine({ canvas, clearColor: 0x0e1117 });
     this.engine.scene.fog = new THREE.Fog(0x0e1117, 90, 320);
     this.engine.scene.add(new THREE.HemisphereLight(0x9fc4ff, 0x1a1f2b, 1.7));
@@ -233,6 +247,39 @@ export class Editor {
       this.scriptAberto = false;
     }
     this.aviso(`Perfil ${acharPerfil(this.perfil).label}.`);
+  }
+
+  // --- Assets -----------------------------------------------------------
+
+  /**
+   * Importa arquivos soltos no editor (arrastar-e-soltar, seção 11).
+   *
+   * Cada arquivo passa pelo mesmo `CatalogoDeAssets` do kit inicial: soltar
+   * de novo um arquivo com o mesmo nome é reimportação (o hash decide se
+   * mudou), não duplicata. Um formato ainda sem importador (glTF, Aseprite,
+   * Tiled, Blender) vira um aviso em vez de travar os outros arquivos do
+   * mesmo arrasto.
+   */
+  async importarArquivos(arquivos: Iterable<File>): Promise<void> {
+    let importados = 0;
+    let ultimoErro: string | null = null;
+    for (const arquivo of arquivos) {
+      try {
+        const bytes = new Uint8Array(await arquivo.arrayBuffer());
+        this.catalogo.registrar(`assets/${arquivo.name}`, bytes);
+        importados++;
+      } catch (erro) {
+        ultimoErro = erro instanceof Error ? erro.message : String(erro);
+      }
+    }
+    if (importados > 0) {
+      this.aviso(
+        importados === 1 ? '1 asset importado.' : `${importados} assets importados.`,
+      );
+    } else if (ultimoErro) {
+      this.aviso(ultimoErro);
+    }
+    this.notify();
   }
 
   // --- Selecao e pincel -----------------------------------------------------

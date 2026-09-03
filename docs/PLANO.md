@@ -289,7 +289,16 @@ M5 ✅ blocos ⇄ código · M6 ✅ gatilho-e-resposta e perfil Design · M7 ✅
 > `@faisca/kit-inicial`: um kit já instalado (herói, moeda, peça de pista,
 > pulo, moeda e música de hub) gerado por código — placeholder de
 > verdade (PNG e WAV reais, passam pelo importador), não a arte licenciada
-> final da seção 11, que ainda falta. Ligar o watcher de disco no editor,
+> final da seção 11, que ainda falta.
+>
+> A segunda fatia dá ao editor um painel de Assets: o kit inicial já entra
+> no catálogo (`editor.catalogo`, um `CatalogoDeAssets`) assim que o
+> editor abre, e arrastar um arquivo — ou clicar para escolher — importa
+> pelo mesmo pipeline, com reimportação por nome de arquivo decidida pelo
+> hash, não por duplicata. Um formato sem importador vira aviso na barra,
+> sem travar o resto do arrasto. Ligar isso a um watcher de disco de
+> verdade (o catálogo já sabe detectar "arquivo mudou" e "arquivo sumiu";
+> falta o editor observar o sistema de arquivos e chamar de novo),
 > foto-vira-sprite e a compressão KTX2/Draco ficam para as próximas
 > fatias da M8.
 

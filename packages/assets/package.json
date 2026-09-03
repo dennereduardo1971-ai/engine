@@ -1,0 +1,11 @@
+{
+  "name": "@faisca/assets",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Pipeline de importacao de assets: reconhecer formato, gerar metadados, detectar reimportacao",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

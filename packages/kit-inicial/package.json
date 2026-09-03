@@ -1,0 +1,14 @@
+{
+  "name": "@faisca/kit-inicial",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Kit inicial de assets: personagens, pecas de pista, sons e musica gerados como placeholder",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@faisca/assets": "*"
+  }
+}

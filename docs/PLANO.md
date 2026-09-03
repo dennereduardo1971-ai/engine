@@ -278,6 +278,21 @@ Entrega em fatias. Cada fatia é um pull request, e termina com **algo que você
 ### Mês 2 — Autoria de verdade
 M5 ✅ blocos ⇄ código · M6 ✅ gatilho-e-resposta e perfil Design · M7 ✅ spline de pista · M8 importação de assets e kit inicial
 
+> **Sobre a M8 (em andamento).** A primeira fatia é o pipeline de
+> importação em si (`@faisca/assets`): reconhecer o formato pela extensão,
+> gerar metadados (tipo, hash, tamanho) e decidir se um caminho é
+> importação nova, reimportação com o arquivo mudado, ou o mesmo de sempre
+> — a parte pura e testável de "reimport automático quando o arquivo muda
+> no disco" da seção 11. Hoje ela reconhece PNG e WAV/OGG; glTF/GLB,
+> Blender, Tiled e Aseprite ficam marcados como "reconhecido, ainda sem
+> importador" para entrar por cima do mesmo formato. Vem junto o
+> `@faisca/kit-inicial`: um kit já instalado (herói, moeda, peça de pista,
+> pulo, moeda e música de hub) gerado por código — placeholder de
+> verdade (PNG e WAV reais, passam pelo importador), não a arte licenciada
+> final da seção 11, que ainda falta. Ligar o watcher de disco no editor,
+> foto-vira-sprite e a compressão KTX2/Draco ficam para as próximas
+> fatias da M8.
+
 > **Sobre a M7.** A pista sai de uma curva Catmull-Rom desenhada clicando no
 > viewport (ferramenta **Pista**): cada ponto guarda posição, largura e
 > inclinação, e o montador gera a fita e o colisor de malha dela do mesmo

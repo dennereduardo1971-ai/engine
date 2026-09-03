@@ -266,7 +266,7 @@ export class Editor {
     for (const arquivo of arquivos) {
       try {
         const bytes = new Uint8Array(await arquivo.arrayBuffer());
-        this.catalogo.registrar(`assets/${arquivo.name}`, bytes);
+        this.catalogo.registrar(caminhoDoArquivo(arquivo), bytes);
         importados++;
       } catch (erro) {
         ultimoErro = erro instanceof Error ? erro.message : String(erro);
@@ -279,6 +279,49 @@ export class Editor {
     } else if (ultimoErro) {
       this.aviso(ultimoErro);
     }
+    this.notify();
+  }
+
+  /**
+   * Sincroniza a pasta `assets/` inteira (seção 11: "reimport automático
+   * quando o arquivo muda no disco"). O navegador não deixa o editor ficar
+   * de olho no disco sozinho — quem escolhe quando é o botão "Sincronizar
+   * pasta", que reabre a pasta pelo seletor do sistema e manda todo o
+   * conteúdo aqui de uma vez. Dali pra frente é o `catalogo` de sempre:
+   * hash decide o que mudou, e `removerAusentes` decide o que sumiu do
+   * disco desde a última sincronização.
+   */
+  async sincronizarPasta(arquivos: Iterable<File>): Promise<void> {
+    const vistos: string[] = [];
+    let novos = 0;
+    let mudados = 0;
+    let ultimoErro: string | null = null;
+    for (const arquivo of arquivos) {
+      const caminho = caminhoDoArquivo(arquivo);
+      vistos.push(caminho);
+      try {
+        const bytes = new Uint8Array(await arquivo.arrayBuffer());
+        const existiaAntes = this.catalogo.obter(caminho) !== undefined;
+        const { mudou } = this.catalogo.registrar(caminho, bytes);
+        if (mudou) {
+          if (existiaAntes) mudados++;
+          else novos++;
+        }
+      } catch (erro) {
+        ultimoErro = erro instanceof Error ? erro.message : String(erro);
+      }
+    }
+    const removidos = this.catalogo.removerAusentes(vistos);
+
+    const partes: string[] = [];
+    if (novos > 0) partes.push(`${novos} novo${novos === 1 ? '' : 's'}`);
+    if (mudados > 0) partes.push(`${mudados} atualizado${mudados === 1 ? '' : 's'}`);
+    if (removidos.length > 0) {
+      partes.push(`${removidos.length} removido${removidos.length === 1 ? '' : 's'}`);
+    }
+    if (partes.length > 0) this.aviso(`Assets sincronizados: ${partes.join(', ')}.`);
+    else if (ultimoErro) this.aviso(ultimoErro);
+    else this.aviso('Assets sincronizados: nada mudou.');
     this.notify();
   }
 
@@ -834,6 +877,16 @@ function lerPerfilSalvo(): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * O caminho de projeto de um `File` do navegador: `webkitRelativePath`
+ * quando ele veio de uma pasta escolhida ("assets/texturas/heroi.png"),
+ * ou `assets/<nome>` para um arquivo solto por arrastar-e-soltar.
+ */
+function caminhoDoArquivo(arquivo: File): string {
+  const relativo = (arquivo as File & { webkitRelativePath?: string }).webkitRelativePath;
+  return relativo && relativo.length > 0 ? relativo : `assets/${arquivo.name}`;
 }
 
 function slug(nome: string): string {

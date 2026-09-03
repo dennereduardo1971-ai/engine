@@ -54,6 +54,21 @@ export function Assets({ editor }: { editor: Editor }) {
         />
       </label>
 
+      <label className="botao">
+        Sincronizar pasta assets/
+        <input
+          type="file"
+          hidden
+          // @ts-expect-error -- webkitdirectory nao esta no tipo do React, mas o navegador entende.
+          webkitdirectory=""
+          directory=""
+          onChange={(event) => {
+            if (event.target.files) void editor.sincronizarPasta(event.target.files);
+            event.target.value = '';
+          }}
+        />
+      </label>
+
       <div className="lista assets-lista">
         {itens.length === 0 ? (
           <p className="vazio">Nenhum asset ainda.</p>

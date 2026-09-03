@@ -296,11 +296,21 @@ M5 ✅ blocos ⇄ código · M6 ✅ gatilho-e-resposta e perfil Design · M7 ✅
 > editor abre, e arrastar um arquivo — ou clicar para escolher — importa
 > pelo mesmo pipeline, com reimportação por nome de arquivo decidida pelo
 > hash, não por duplicata. Um formato sem importador vira aviso na barra,
-> sem travar o resto do arrasto. Ligar isso a um watcher de disco de
-> verdade (o catálogo já sabe detectar "arquivo mudou" e "arquivo sumiu";
-> falta o editor observar o sistema de arquivos e chamar de novo),
-> foto-vira-sprite e a compressão KTX2/Draco ficam para as próximas
-> fatias da M8.
+> sem travar o resto do arrasto.
+>
+> A terceira fatia é o mais perto que um editor rodando no navegador chega
+> de "reimport automático quando o arquivo muda no disco": o botão
+> **Sincronizar pasta assets/** reabre a pasta inteira pelo seletor do
+> sistema (`webkitdirectory`) e manda todo o conteúdo de volta ao
+> `catalogo` de uma vez — o hash de cada arquivo decide sozinho quem é
+> novo, quem mudou e quem ficou igual, e `removerAusentes` tira do
+> catálogo o que sumiu da pasta desde a última sincronização. Não é um
+> watcher de verdade (o navegador não deixa o editor ficar de olho no
+> disco sozinho, só reagir quando alguém aperta o botão), mas reaproveita
+> a mesma lógica pura e já testada do `@faisca/assets` — nada novo para
+> testar aqui, só o encanamento de ler `File.webkitRelativePath`. Um
+> watcher de disco de verdade (fora do navegador), foto-vira-sprite e a
+> compressão KTX2/Draco ficam para as próximas fatias da M8.
 
 > **Sobre a M7.** A pista sai de uma curva Catmull-Rom desenhada clicando no
 > viewport (ferramenta **Pista**): cada ponto guarda posição, largura e

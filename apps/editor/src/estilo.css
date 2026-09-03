@@ -323,6 +323,25 @@ button.link {
   cursor: pointer;
 }
 
+/* Um <label> que age como botao — para abrir um seletor de arquivo/pasta
+   escondido sem precisar de um segundo elemento clicavel por cima. */
+label.botao {
+  display: block;
+  margin-top: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  text-align: center;
+  color: var(--texto);
+  background: var(--painel-alto);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  cursor: pointer;
+}
+
+label.botao:hover {
+  background: #273046;
+}
+
 .zona-de-soltar.sobre {
   border-color: var(--marca);
   color: var(--texto);

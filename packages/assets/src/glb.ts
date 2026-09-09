@@ -1,23 +1,42 @@
 /**
- * Validação mínima de um GLB (glTF binário) — seção 11.
+ * Leitura da casca de um GLB (glTF binário) — seção 11.
  *
- * Não monta a cena (isso é trabalho do motor 3D, que ainda não sabe
- * desenhar um glTF): só confere que o arquivo é mesmo um GLB — assinatura,
- * tamanho batendo com o cabeçalho, e um primeiro bloco JSON com o campo
- * `asset` que todo glTF 2.0 tem (checado por `validarDocumentoGltf`, a
- * mesma regra usada pelo `.gltf` em texto). É o suficiente para separar
- * "arquivo bom" de "arquivo corrompido ou não é isso" antes de aceitar no
- * catálogo.
+ * Um GLB é um cabeçalho de 12 bytes e uma fila de blocos: o primeiro é o
+ * JSON do glTF, e o segundo (quando existe) é o binário com vértices e
+ * texturas embutidas. Este módulo abre essa casca e confere que ela é mesmo
+ * um GLB — assinatura, tamanho batendo com o cabeçalho, e um JSON com o
+ * campo `asset` que todo glTF 2.0 tem (`validarDocumentoGltf`, a mesma
+ * regra usada pelo `.gltf` em texto).
+ *
+ * Ele não monta a cena: quem transforma isto num objeto na tela é o
+ * `CarregadorDeModelos` do `@faisca/runtime`, que é o lado que sabe de
+ * Three.js. Aqui é só o suficiente para separar "arquivo bom" de "arquivo
+ * corrompido ou não é isso" antes de aceitar no catálogo, e para dizer de
+ * que outros arquivos o modelo precisa (ver `dependencias.ts`).
  */
 import { validarDocumentoGltf } from './gltf.ts';
 
 const ASSINATURA = 0x46546c67; // "glTF" em little-endian
 const TIPO_JSON = 0x4e4f534a; // "JSON" em little-endian
+const TIPO_BIN = 0x004e4942; // "BIN\0" em little-endian
 const TAMANHO_CABECALHO = 12;
 const TAMANHO_CABECALHO_CHUNK = 8;
 
-/** Lança se `bytes` não for um GLB válido; não faz nada em caso de sucesso. */
-export function validarGlb(bytes: Uint8Array): void {
+export interface BlocosDoGlb {
+  /** O documento glTF do primeiro bloco, já validado. */
+  json: unknown;
+  /** O bloco binário, ou `null` num GLB que só tem o JSON. */
+  binario: Uint8Array | null;
+}
+
+/**
+ * Abre um GLB em seus blocos.
+ *
+ * Existe separado de `validarGlb` porque quem vai *abrir* o modelo — o
+ * carregador do runtime, a busca de dependências — precisa do conteúdo, e
+ * não só do veredito; ler os blocos duas vezes seria pagar o parse de novo.
+ */
+export function blocosDoGlb(bytes: Uint8Array): BlocosDoGlb {
   if (bytes.length < TAMANHO_CABECALHO + TAMANHO_CABECALHO_CHUNK) {
     throw new Error('Faísca: GLB inválido — arquivo curto demais para ter um cabeçalho.');
   }
@@ -44,15 +63,45 @@ export function validarGlb(bytes: Uint8Array): void {
     throw new Error('Faísca: GLB inválido — o bloco JSON está truncado.');
   }
 
-  let doc: unknown;
+  let json: unknown;
   try {
-    doc = JSON.parse(new TextDecoder().decode(bytes.subarray(inicioJson, fimJson)));
+    json = JSON.parse(new TextDecoder().decode(bytes.subarray(inicioJson, fimJson)));
   } catch {
     throw new Error('Faísca: GLB inválido — o bloco JSON não é um JSON válido.');
   }
   try {
-    validarDocumentoGltf(doc);
+    validarDocumentoGltf(json);
   } catch {
     throw new Error('Faísca: GLB inválido — falta o campo "asset" que todo glTF tem.');
   }
+
+  return { json, binario: binarioApos(bytes, vista, fimJson) };
+}
+
+/**
+ * O primeiro bloco `BIN` depois do JSON. Percorre os blocos em vez de
+ * assumir que ele é o segundo: o spec permite blocos desconhecidos no meio,
+ * e quem não conhece um bloco deve pulá-lo, não desistir.
+ */
+function binarioApos(bytes: Uint8Array, vista: DataView, inicio: number): Uint8Array | null {
+  let cursor = inicio;
+  while (cursor + TAMANHO_CABECALHO_CHUNK <= bytes.length) {
+    const tamanho = vista.getUint32(cursor, true);
+    const tipo = vista.getUint32(cursor + 4, true);
+    const dados = cursor + TAMANHO_CABECALHO_CHUNK;
+    if (dados + tamanho > bytes.length) return null; // bloco truncado: sem binário
+    if (tipo === TIPO_BIN) return bytes.subarray(dados, dados + tamanho);
+    cursor = dados + tamanho;
+  }
+  return null;
+}
+
+/** O documento JSON de dentro de um GLB, já validado. */
+export function jsonDoGlb(bytes: Uint8Array): unknown {
+  return blocosDoGlb(bytes).json;
+}
+
+/** Lança se `bytes` não for um GLB válido; não faz nada em caso de sucesso. */
+export function validarGlb(bytes: Uint8Array): void {
+  blocosDoGlb(bytes);
 }

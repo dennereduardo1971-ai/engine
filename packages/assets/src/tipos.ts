@@ -29,4 +29,10 @@ export interface AssetMeta {
   tamanho: number;
   /** Quando foi importado (`Date.now()` por padrao, injetavel em teste). */
   importadoEm: number;
+  /**
+   * Outros arquivos de que este asset precisa para abrir, em caminhos do
+   * projeto — um `.gltf` aponta para o `.bin` dos vertices e para as
+   * texturas. Vazio (e ausente) para quem se basta, que e todo o resto.
+   */
+  dependencias?: readonly string[];
 }

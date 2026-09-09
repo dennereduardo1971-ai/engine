@@ -38,6 +38,18 @@ export class CatalogoDeAssets {
     return { asset, mudou: anterior === undefined || anterior.hash !== asset.hash };
   }
 
+  /**
+   * Os arquivos que `caminho` diz precisar e que ainda nao estao no
+   * catalogo. Um `.gltf` importado sozinho, sem o `.bin` dos vertices ao
+   * lado, abre vazio — e melhor avisar na hora do arrasto do que deixar a
+   * crianca achar que o modelo dela quebrou.
+   */
+  faltando(caminho: string): string[] {
+    const asset = this.itens.get(caminho);
+    if (!asset?.dependencias) return [];
+    return asset.dependencias.filter((dependencia) => !this.itens.has(dependencia));
+  }
+
   remover(caminho: string): boolean {
     return this.itens.delete(caminho);
   }

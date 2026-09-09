@@ -1,5 +1,6 @@
 import { validarAse } from './ase.ts';
 import { validarBlend } from './blend.ts';
+import { dependenciasDeModelo } from './dependencias.ts';
 import { extensaoDe, formatoDe } from './formatos.ts';
 import { validarGlb } from './glb.ts';
 import { validarGltfTexto } from './gltf.ts';
@@ -52,6 +53,11 @@ export function importarAsset(
   else if (extensao === 'ase' || extensao === 'aseprite') validarAse(bytes);
   else if (extensao === 'blend') validarBlend(bytes);
 
+  // Um `.gltf` (e, mais raro, um `.glb`) pode apontar para arquivos ao lado.
+  // Quem importa precisa saber disso na hora, para pedir o resto antes de o
+  // modelo abrir vazio — ver `dependencias.ts`.
+  const dependencias = dependenciasDeModelo(caminho, bytes);
+
   const agora = opcoes.agora ?? Date.now;
   return {
     caminho,
@@ -60,5 +66,6 @@ export function importarAsset(
     hash: hashBytes(bytes),
     tamanho: bytes.length,
     importadoEm: agora(),
+    ...(dependencias.length > 0 ? { dependencias } : {}),
   };
 }

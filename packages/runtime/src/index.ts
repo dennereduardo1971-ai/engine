@@ -50,6 +50,13 @@ export { Renderer, type GraphicsReport, type RendererOptions } from './render/re
 export { QualitySupervisor, type QualityRung, type QualityOptions } from './render/quality.ts';
 export { ObjectRegistry, visualSyncSystem } from './render/scene-sync.ts';
 export { InstancedBatch, instancedSyncSystem } from './render/instancing.ts';
+export {
+  CarregadorDeModelos,
+  malhaDeColisao,
+  type FonteDeArquivos,
+  type Modelo,
+  type OpcoesDeModelo,
+} from './render/modelos.ts';
 
 export { Transform, Velocity, Visual, Instanced, placeAt } from './scene/components.ts';
 export { transformHistorySystem, velocitySystem } from './scene/systems.ts';

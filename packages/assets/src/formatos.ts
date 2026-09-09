@@ -22,6 +22,11 @@ const FORMATOS: Record<string, FormatoInfo> = {
   ogg: { tipo: 'som', suportado: true },
   gltf: { tipo: 'modelo', suportado: true },
   glb: { tipo: 'modelo', suportado: true },
+  // O `.bin` nao e um formato do plano: e o arquivo de vertices que um
+  // `.gltf` em texto aponta ao lado (ver `dependencias.ts`). Ele nao vale
+  // nada sozinho, mas precisa poder entrar no catalogo — senao o `.gltf`
+  // fica para sempre com uma dependencia impossivel de satisfazer.
+  bin: { tipo: 'modelo', suportado: true },
   blend: { tipo: 'modelo', suportado: true },
   tmx: { tipo: 'modelo', suportado: true },
   ase: { tipo: 'textura', suportado: true },

@@ -38,6 +38,7 @@ export {
   pieceBounds,
   pieceGeometry,
   pieceOrPlaceholder,
+  escalarTrimesh,
   pieceTrimesh,
   scaledTrimesh,
   type MeshKind,
@@ -61,6 +62,7 @@ export {
   SceneAssembler,
   zonaDe,
   type AssemblerHost,
+  type ProvedorDeModelos,
   type SpawnPoint,
   type Zona,
 } from './montador.ts';

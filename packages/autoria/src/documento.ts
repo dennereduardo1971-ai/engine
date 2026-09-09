@@ -60,6 +60,16 @@ export interface SceneNode {
   /** Presente so nos nos de pista desenhada (secao 9: spline de pista). */
   spline?: SplineData | null;
   /**
+   * Caminho do modelo 3D importado que este no desenha, nos nos da peca
+   * `modelo` (secao 11: importacao de glTF/GLB).
+   *
+   * E o *caminho* dentro de `assets/`, e nao os bytes nem um id: e ele que
+   * o catalogo usa como chave, e e por isso que trocar o arquivo no disco e
+   * reimportar troca o modelo de todo mundo que aponta para ele, sem mexer
+   * na cena.
+   */
+  modelo?: string | null;
+  /**
    * Valores editados dos componentes, por nome de componente no codigo:
    * `{ SpeedCharacter: { maxSpeed: 30 } }`. So o que foi mexido mora aqui; o
    * resto vem dos valores de fabrica do componente.
@@ -95,6 +105,7 @@ export type SceneChange =
   | { kind: 'remove'; id: string }
   | { kind: 'transform'; id: string }
   | { kind: 'spline'; id: string }
+  | { kind: 'modelo'; id: string }
   | { kind: 'fields'; id: string; component: string }
   | { kind: 'appearance'; id: string }
   | { kind: 'name'; id: string }
@@ -121,6 +132,7 @@ export interface AddOptions {
   id?: string;
   script?: Script | null;
   spline?: SplineData | null;
+  modelo?: string | null;
 }
 
 export class SceneDocument {
@@ -191,6 +203,7 @@ export class SceneDocument {
       visible: options.visible ?? true,
       script: options.script ?? null,
       spline: options.spline ? cloneSpline(options.spline) : null,
+      modelo: options.modelo ?? null,
     };
     this.byId.set(id, node);
     this.order.push(id);
@@ -260,6 +273,21 @@ export class SceneDocument {
     if (!node) return;
     node.spline = data ? cloneSpline(data) : null;
     this.emit({ kind: 'spline', id });
+  }
+
+  /**
+   * Aponta o no para um modelo importado (ou tira o modelo, com `null`).
+   *
+   * Nao valida o caminho de proposito: quem sabe se o arquivo existe e o
+   * catalogo de assets, que mora no editor. Um caminho que nao abre vira um
+   * aviso na tela, e nao um no perdido — do mesmo jeito que uma peca
+   * desconhecida vira um cubo roxo em vez de sumir.
+   */
+  setModelo(id: string, caminho: string | null): void {
+    const node = this.byId.get(id);
+    if (!node || (node.modelo ?? null) === caminho) return;
+    node.modelo = caminho;
+    this.emit({ kind: 'modelo', id });
   }
 
   setField(id: string, component: string, field: string, value: number): void {
@@ -337,6 +365,7 @@ export class SceneDocument {
         visible: node.visible,
         script: node.script,
         spline: node.spline,
+        modelo: node.modelo,
       });
       remap.set(node.id, copy.id);
       first ??= copy;
@@ -366,6 +395,7 @@ export class SceneDocument {
         transform: { ...node.transform },
         fields: cloneFields(node.fields),
         spline: node.spline ? cloneSpline(node.spline) : null,
+        modelo: node.modelo ?? null,
       })),
     };
   }
@@ -388,6 +418,7 @@ export class SceneDocument {
         visible: node.visible !== false,
         script: node.script ?? null,
         spline: node.spline ? cloneSpline(node.spline) : null,
+        modelo: node.modelo ?? null,
       };
       this.byId.set(copy.id, copy);
       this.order.push(copy.id);

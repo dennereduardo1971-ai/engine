@@ -30,7 +30,16 @@ export type MeshKind =
    * de `node.spline` a cada no, no montador, porque cada pista desenhada e
    * unica (o cache por `piece.id` deste arquivo assume uma malha por tipo).
    */
-  | 'spline';
+  | 'spline'
+  /**
+   * Modelo 3D importado (secao 11: glTF/GLB). Como a spline, a geometria de
+   * `buildGeometry` e so um marcador — a malha de verdade e o arquivo que
+   * `node.modelo` aponta, lido pelo carregador do runtime e trocado pelo
+   * montador quando chega. O marcador nao e vazio, e uma caixa: enquanto o
+   * arquivo carrega (ou se ele nao abrir), tem que dar para ver onde o
+   * modelo foi posto.
+   */
+  | 'modelo';
 
 export interface MeshSpec {
   kind: MeshKind;
@@ -302,6 +311,19 @@ export const PIECES: readonly Piece[] = [
     components: { Goal: { radius: 2.2 } },
   },
   {
+    id: 'modelo',
+    label: 'Modelo',
+    icon: '🗿',
+    group: 'cenario',
+    hint: 'Um modelo 3D seu, importado no painel de Assets. Escolha o arquivo no inspetor.',
+    mesh: { kind: 'modelo', size: [2, 2, 2] },
+    color: 0x8a8f98,
+    instanced: false,
+    solid: true,
+    dropY: 0,
+    components: {},
+  },
+  {
     id: 'arvore',
     label: 'Árvore',
     icon: '🌲',
@@ -368,6 +390,13 @@ function buildGeometry(mesh: MeshSpec): THREE.BufferGeometry {
     case 'spline':
       // Marcador vazio — o montador troca por `buildSplineGeometry(node.spline)`.
       return new THREE.BufferGeometry();
+    case 'modelo': {
+      // Marcador visivel — o montador troca pelo modelo de `node.modelo`
+      // quando o arquivo termina de carregar.
+      const geometry = new THREE.BoxGeometry(w, h, d);
+      geometry.translate(0, h / 2, 0);
+      return geometry;
+    }
     case 'caixa': {
       const geometry = new THREE.BoxGeometry(w, h, d);
       geometry.translate(0, h / 2, 0);
@@ -520,7 +549,11 @@ const trimeshCache = new Map<string, TrimeshData>();
 export function pieceTrimesh(piece: Piece): TrimeshData | null {
   // Grupo nao tem malha, e spline tem a malha dela mesma no montador — nao no
   // cache por tipo desta funcao (ver MeshKind).
-  if (!piece.solid || piece.mesh.kind === 'grupo' || piece.mesh.kind === 'spline') return null;
+  if (!piece.solid) return null;
+  // Grupo nao tem malha; spline e modelo tem a malha *deles*, que e uma por
+  // no e nao uma por tipo de peca — o montador cuida das duas.
+  if (piece.mesh.kind === 'grupo' || piece.mesh.kind === 'spline') return null;
+  if (piece.mesh.kind === 'modelo') return null;
   const cached = trimeshCache.get(piece.id);
   if (cached) return cached;
 
@@ -545,10 +578,24 @@ export function scaledTrimesh(
   sy: number,
   sz: number,
 ): TrimeshData | null {
-  const base = pieceTrimesh(piece);
+  return escalarTrimesh(pieceTrimesh(piece), sx, sy, sz);
+}
+
+/**
+ * A mesma malha, com a escala do no ja nos vertices.
+ *
+ * O Rapier nao escala colisor de malha — quem escala e a lista de vertices.
+ * Serve tanto para a malha de fabrica de uma peca quanto para a de um modelo
+ * importado, e por isso mora aqui e nao dentro de `scaledTrimesh`.
+ */
+export function escalarTrimesh(
+  base: TrimeshData | null,
+  sx: number,
+  sy: number,
+  sz: number,
+): TrimeshData | null {
   if (!base) return null;
   if (sx === 1 && sy === 1 && sz === 1) return base;
-  // O Rapier nao escala colisor de malha: quem escala e a lista de vertices.
   const vertices = new Float32Array(base.vertices.length);
   for (let i = 0; i < base.vertices.length; i += 3) {
     vertices[i] = base.vertices[i] * sx;

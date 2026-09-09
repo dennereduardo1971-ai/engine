@@ -67,6 +67,7 @@ function writeNode(node: SceneNode): string {
   if (node.color !== null) partes.push(`"cor": "${hex(node.color)}"`);
   if (!node.visible) partes.push('"oculto": true');
   if (node.spline) partes.push(`"pista": ${writeSpline(node.spline)}`);
+  if (node.modelo) partes.push(`"modelo": ${JSON.stringify(node.modelo)}`);
 
   const componentes = Object.entries(node.fields).filter(
     ([, values]) => Object.keys(values).length > 0,
@@ -171,9 +172,12 @@ function readNode(bruto: unknown, indice: number): SceneNode {
   const script = readScript(no.script);
   const spline = readSpline(no.pista);
 
+  const modelo = typeof no.modelo === 'string' && no.modelo.length > 0 ? no.modelo : null;
+
   return {
     ...(script ? { script } : {}),
     ...(spline ? { spline } : {}),
+    ...(modelo ? { modelo } : {}),
     id: typeof no.id === 'string' ? no.id : `n${indice + 1}`,
     name: typeof no.nome === 'string' ? no.nome : peca,
     piece: peca,

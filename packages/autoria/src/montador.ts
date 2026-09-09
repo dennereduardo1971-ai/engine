@@ -5,6 +5,7 @@ import {
   defineSystem,
   type Entity,
   type InstancedBatch,
+  malhaDeColisao,
   type PhysicsWorld,
   placeAt,
   type System,
@@ -36,6 +37,7 @@ import {
   type SplineData,
 } from './documento.ts';
 import {
+  escalarTrimesh,
   type Piece,
   pieceBounds,
   pieceGeometry,
@@ -58,6 +60,20 @@ import { worldPlacement, yawQuaternion } from './transformacoes.ts';
  * Ele fala com um "hospedeiro" e nao com a `Engine` inteira. Assim o editor
  * passa a engine de verdade e o teste passa uma cena pelada, sem WebGL.
  */
+/**
+ * Quem sabe abrir um modelo 3D importado.
+ *
+ * O montador nao le arquivo: ele pede um objeto pronto por caminho, e quem
+ * responde e o editor (com o catalogo de assets do projeto) ou o jogo
+ * publicado (com o pacote). Assim a autoria continua sem saber de disco, de
+ * `File` do navegador nem de `fetch` — e o teste responde com um cubo.
+ *
+ * Devolve `null` quando o caminho nao tem modelo nenhum; lanca quando o
+ * arquivo existe mas nao abre (o montador transforma isso num aviso, e nao
+ * num no perdido).
+ */
+export type ProvedorDeModelos = (caminho: string) => Promise<THREE.Object3D | null>;
+
 export interface AssemblerHost {
   readonly world: World;
   readonly scene: THREE.Object3D;
@@ -70,6 +86,8 @@ export interface AssemblerHost {
     material: THREE.Material,
     capacity: number,
   ): InstancedBatch;
+  /** Ausente numa engine que nao carrega modelo (o teste, o jogo sem 3D). */
+  readonly carregarModelo?: ProvedorDeModelos;
 }
 
 /**
@@ -115,6 +133,14 @@ interface Built {
   batch: InstancedBatch | null;
   /** Colisor da peca no Rapier, quando ela e solida. */
   collider: Collider | null;
+  /**
+   * O caminho de modelo que este no pediu, e a malha que voltou. O caminho
+   * e o que distingue uma resposta que ainda serve de uma que chegou tarde:
+   * quem trocou de modelo tres vezes enquanto o primeiro carregava nao pode
+   * receber o primeiro de volta.
+   */
+  modelo: string | null;
+  malhaDoModelo: TrimeshData | null;
 }
 
 /** Onde o personagem nasce quando o teste comeca. */
@@ -160,6 +186,13 @@ export class SceneAssembler {
    * para saber se precisa refazer.
    */
   private readonly splineCache = new Map<string, { data: SplineData; mesh: SplineMesh }>();
+
+  /**
+   * Modelos que nao abriram, por no. Um caminho errado no arquivo do projeto
+   * nao pode derrubar a fase: o no continua la, com o marcador da peca, e o
+   * motivo fica aqui para o editor mostrar.
+   */
+  private readonly errosDeModelo = new Map<string, string>();
 
   /** Personagem do teste ao vivo, ou -1 fora do teste. */
   hero: Entity = -1;
@@ -709,6 +742,14 @@ export class SceneAssembler {
         if (node) this.create(node);
         break;
       }
+      case 'modelo': {
+        // Trocar o arquivo do modelo refaz o no: e o mesmo caminho de
+        // 'appearance', e por um motivo parecido — o objeto na cena e outro.
+        const node = this.document.get(change.id);
+        this.destroy(change.id);
+        if (node) this.create(node);
+        break;
+      }
       case 'name':
         break;
       case 'reload':
@@ -728,6 +769,8 @@ export class SceneAssembler {
       object: null,
       batch: null,
       collider: null,
+      modelo: node.modelo ?? null,
+      malhaDoModelo: null,
     };
 
     if (piece.mesh.kind !== 'grupo' && node.visible) {
@@ -759,6 +802,9 @@ export class SceneAssembler {
     this.built.set(node.id, built);
     this.byEntity.set(entity, node.id);
     this.place(node);
+    // O modelo importado chega depois: o no ja esta na cena, com o marcador
+    // no lugar, e a malha de verdade entra por cima quando o arquivo abre.
+    if (built.modelo && node.visible) void this.trocarPeloModelo(built, built.modelo);
     // Primeiro os valores de fabrica da peca, depois o que foi editado no no.
     if (node.piece !== 'inicio') {
       for (const [nome, valores] of Object.entries(piece.components)) {
@@ -766,6 +812,54 @@ export class SceneAssembler {
       }
     }
     this.applyFields(node.id, null);
+  }
+
+  /**
+   * Troca o marcador da peca `modelo` pelo modelo de verdade.
+   *
+   * Tudo aqui e depois do `await`, entao nada pode ser dado como certo: o no
+   * pode ter sido apagado, o documento recarregado, ou alguem pode ter
+   * escolhido outro arquivo. As duas conferencias — o `Built` ainda ser o
+   * mesmo objeto, e o caminho ainda ser o pedido — sao o que impede uma
+   * resposta atrasada de reaparecer numa cena que ja seguiu em frente.
+   */
+  private async trocarPeloModelo(built: Built, caminho: string): Promise<void> {
+    const carregar = this.host.carregarModelo;
+    if (!carregar) return;
+
+    let objeto: THREE.Object3D | null;
+    try {
+      objeto = await carregar(caminho);
+    } catch (erro) {
+      this.errosDeModelo.set(built.node, erro instanceof Error ? erro.message : String(erro));
+      return;
+    }
+    if (!objeto) return;
+    if (this.built.get(built.node) !== built || built.modelo !== caminho) return;
+
+    const node = this.document.get(built.node);
+    if (!node) return;
+
+    if (built.batch) {
+      built.batch.release(built.entity);
+      built.batch = null;
+    }
+    if (built.object) this.host.detach(built.entity);
+
+    objeto.userData.faiscaNode = built.node;
+    this.host.attach(built.entity, objeto);
+    built.object = objeto;
+    built.malhaDoModelo = malhaDeColisao(objeto);
+    this.errosDeModelo.delete(built.node);
+
+    // O colisor sai da malha que acabou de chegar, e nao da caixa do
+    // marcador: ate aqui a peca era um lugar reservado, agora ela e a forma.
+    this.place(node);
+  }
+
+  /** Os modelos que nao abriram, por no — o editor mostra isso na barra. */
+  errosDeModelos(): { node: string; mensagem: string }[] {
+    return [...this.errosDeModelo].map(([node, mensagem]) => ({ node, mensagem }));
   }
 
   private destroy(nodeId: string): void {
@@ -781,6 +875,7 @@ export class SceneAssembler {
     this.byEntity.delete(built.entity);
     this.built.delete(nodeId);
     this.splineCache.delete(nodeId);
+    this.errosDeModelo.delete(nodeId);
   }
 
   /** A malha da pista desenhada deste no, ou `null` para uma peca comum. */
@@ -842,6 +937,7 @@ export class SceneAssembler {
     const place = worldPlacement(this.document, node);
     const malha: TrimeshData | null =
       this.splineMeshFor(node)?.trimesh ??
+      escalarTrimesh(built.malhaDoModelo, place.sx, place.sy, place.sz) ??
       scaledTrimesh(built.piece, place.sx, place.sy, place.sz);
     if (!malha) return;
 

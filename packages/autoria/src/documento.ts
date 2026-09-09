@@ -290,6 +290,20 @@ export class SceneDocument {
     this.emit({ kind: 'modelo', id });
   }
 
+  /**
+   * Avisa que o arquivo de um modelo mudou no disco (reimportação).
+   *
+   * O caminho continua o mesmo — quem mudou foi o conteúdo —, então nenhum
+   * nó precisa ser editado; o que precisa é que o montador refaça os que
+   * apontam para ele. É o mesmo aviso de trocar de modelo, e por isso o
+   * montador não precisa saber que existe reimportação.
+   */
+  modeloRecarregado(caminho: string): void {
+    for (const node of this.byId.values()) {
+      if (node.modelo === caminho) this.emit({ kind: 'modelo', id: node.id });
+    }
+  }
+
   setField(id: string, component: string, field: string, value: number): void {
     const node = this.byId.get(id);
     if (!node || !Number.isFinite(value)) return;

@@ -1,7 +1,14 @@
 import * as THREE from 'three';
-import { CatalogoDeAssets } from '@faisca/assets';
+import { CatalogoDeAssets, DepositoDeArquivos } from '@faisca/assets';
 import { kitInicial } from '@faisca/kit-inicial';
-import { Engine, PerfHud, SaveSlot, Transform, defineSystem } from '@faisca/runtime';
+import {
+  CarregadorDeModelos,
+  Engine,
+  PerfHud,
+  SaveSlot,
+  Transform,
+  defineSystem,
+} from '@faisca/runtime';
 import {
   followCameraSystem,
   GameHud,
@@ -88,6 +95,15 @@ export function fonteVivaValida(id: string): id is FonteViva {
   return FONTES_VIVAS.some((fonte) => fonte.id === id);
 }
 
+/**
+ * Altura em que todo modelo importado entra na cena, em unidades de mundo.
+ *
+ * Perto do personagem (que tem pouco mais de 2), e por isso legível na hora:
+ * dá para ver o que entrou sem procurar. Quem quiser outro tamanho mexe na
+ * escala do nó, como em qualquer peça.
+ */
+const ALTURA_DE_MODELO = 2;
+
 export class Editor {
   readonly engine: Engine;
   readonly document = new SceneDocument();
@@ -109,6 +125,13 @@ export class Editor {
    * projeto".
    */
   readonly catalogo = new CatalogoDeAssets();
+  /**
+   * Os bytes dos arquivos importados. O catálogo guarda a decisão (tipo,
+   * hash, dependências); os bytes ficam aqui, porque desenhar um modelo
+   * precisa do conteúdo e o `File` do arrasto some assim que o navegador
+   * termina de ler.
+   */
+  readonly arquivos = new DepositoDeArquivos();
   /**
    * A tela de interface sendo montada (M9). Uma só tela por projeto por
    * enquanto; várias telas ficam para depois. O arquivo `.ui` já vai e volta
@@ -149,6 +172,14 @@ export class Editor {
    */
   perfil: Perfil = perfilValido(lerPerfilSalvo());
 
+  /**
+   * Quem abre os modelos importados, com cache por caminho: dez cópias do
+   * mesmo modelo na fase leem o arquivo uma vez só.
+   */
+  private readonly modelos = new CarregadorDeModelos(async (caminho) =>
+    this.arquivos.ler(caminho),
+  );
+
   private readonly listeners = new Set<() => void>();
   /**
    * O progresso guardado, por fase.
@@ -172,7 +203,9 @@ export class Editor {
     this.palco = palco;
     // O kit inicial já entra no catálogo: ninguém abre o editor de mãos
     // vazias (seção 11 — "kit já instalado, sem precisar importar nada").
-    for (const { asset, bytes } of kitInicial()) this.catalogo.registrar(asset.caminho, bytes);
+    for (const { asset, bytes } of kitInicial()) {
+      this.arquivos.registrarNos(this.catalogo, asset.caminho, bytes);
+    }
 
     this.engine = new Engine({ canvas, clearColor: 0x0e1117 });
     this.engine.scene.fog = new THREE.Fog(0x0e1117, 90, 320);
@@ -181,6 +214,9 @@ export class Editor {
     sol.position.set(30, 50, 20);
     this.engine.scene.add(sol);
 
+    // A engine é o hospedeiro do montador (ver `AssemblerHost`); é por ela
+    // que a peça Modelo chega ao carregador acima.
+    this.engine.carregarModelo = (caminho) => this.abrirModelo(caminho);
     this.assembler = new SceneAssembler(this.engine, this.document);
     this.history = new History(this.document);
     // O viewport pergunta o pincel e a altura a cada clique. Sao leituras, e
@@ -335,12 +371,45 @@ export class Editor {
    * mesmo arrasto.
    */
   async importarArquivos(arquivos: Iterable<File>): Promise<void> {
+    await this.importarItens(
+      [...arquivos].map((arquivo) => ({ caminho: caminhoDoArquivo(arquivo), arquivo })),
+    );
+  }
+
+  /**
+   * Importa o que foi solto na zona de arrastar, pasta inclusive.
+   *
+   * Um modelo `.gltf` quase nunca é um arquivo só: ele vem numa pasta, com o
+   * `.bin` dos vértices e uma subpasta `textures/`, e os caminhos dentro do
+   * arquivo são relativos a ela. `dataTransfer.files` entrega uma lista
+   * chapada, sem pasta nenhuma — importar por ali perderia o `textures/` e o
+   * modelo abriria sem textura. Por isso este caminho anda pelas *entradas*
+   * do arrasto (`webkitGetAsEntry`), que é o que preserva a árvore.
+   *
+   * As entradas são pegas antes de qualquer `await`: elas só valem enquanto o
+   * evento do arrasto está vivo.
+   */
+  async importarArrasto(dados: DataTransfer): Promise<void> {
+    const raizes = [...dados.items]
+      .map((item) => item.webkitGetAsEntry?.() ?? null)
+      .filter((entrada): entrada is FileSystemEntry => entrada !== null);
+
+    if (raizes.length === 0) {
+      await this.importarArquivos(dados.files);
+      return;
+    }
+    await this.importarItens(await itensDeEntradas(raizes));
+  }
+
+  /** O caminho comum de toda importação: catálogo, bytes e recarga. */
+  private async importarItens(itens: { caminho: string; arquivo: File }[]): Promise<void> {
     let importados = 0;
     let ultimoErro: string | null = null;
-    for (const arquivo of arquivos) {
+    for (const { caminho, arquivo } of itens) {
       try {
         const bytes = new Uint8Array(await arquivo.arrayBuffer());
-        this.catalogo.registrar(caminhoDoArquivo(arquivo), bytes);
+        const { mudou } = this.arquivos.registrarNos(this.catalogo, caminho, bytes);
+        if (mudou) this.recarregarModelo(caminho);
         importados++;
       } catch (erro) {
         ultimoErro = erro instanceof Error ? erro.message : String(erro);
@@ -354,6 +423,71 @@ export class Editor {
       this.aviso(ultimoErro);
     }
     this.notify();
+  }
+
+  /**
+   * Abre um modelo importado para a peça Modelo.
+   *
+   * Todo modelo entra do mesmo tamanho e apoiado pela base — a mesma regra
+   * das peças de fábrica ("o Y do nó é onde ela encosta"). Sem isso, um
+   * modelo baixado da internet chega em centímetros ou em metros conforme
+   * quem exportou, e a criança teria de adivinhar três números no inspetor
+   * antes de ver qualquer coisa. Do tamanho padrão em diante, quem manda é a
+   * escala do nó, como em qualquer outra peça.
+   */
+  private async abrirModelo(caminho: string): Promise<THREE.Object3D | null> {
+    try {
+      const modelo = await this.modelos.carregar(caminho, {
+        alturaAlvo: ALTURA_DE_MODELO,
+        assentar: true,
+      });
+      return modelo.instanciar();
+    } catch (erro) {
+      // O montador já deixa o nó de pé com o marcador; o que falta é alguém
+      // dizer o motivo, e a barra é onde o resto dos avisos do editor sai.
+      this.aviso(erro instanceof Error ? erro.message : String(erro));
+      this.notify();
+      throw erro;
+    }
+  }
+
+  /**
+   * O arquivo de um modelo mudou (reimportação) ou saiu do projeto: esquece
+   * o que estava lido e refaz os nós que apontam para ele. É o "reimport
+   * automático" da seção 11 chegando até a cena, e não parando no catálogo.
+   */
+  private recarregarModelo(caminho: string): void {
+    if (!ehModelo(caminho)) return;
+    this.modelos.invalidar(caminho);
+    this.document.modeloRecarregado(caminho);
+  }
+
+  /**
+   * Põe um modelo importado na fase, na altura de trabalho, e o seleciona.
+   * É o que o botão do painel de Assets faz — o caminho mais curto entre
+   * "arrastei o arquivo" e "está na minha fase".
+   */
+  adicionarModelo(caminho: string): SceneNode | null {
+    const faltando = this.catalogo.faltando(caminho);
+    if (faltando.length > 0) {
+      this.aviso(
+        `Faltam arquivos deste modelo: ${faltando.join(', ')}. Importe a pasta inteira dele.`,
+      );
+      this.notify();
+      return null;
+    }
+
+    this.history.record('colocar Modelo');
+    const pai = this.grupoPara('cenario');
+    const local = localFromWorld(this.document, pai, 0, this.workHeight, 0);
+    const no = this.document.add('modelo', {
+      name: this.nomeLivre(nomeDeArquivo(caminho)),
+      parent: pai,
+      transform: { ...local },
+      modelo: caminho,
+    });
+    this.select(no.id);
+    return no;
   }
 
   /**
@@ -376,16 +510,21 @@ export class Editor {
       try {
         const bytes = new Uint8Array(await arquivo.arrayBuffer());
         const existiaAntes = this.catalogo.obter(caminho) !== undefined;
-        const { mudou } = this.catalogo.registrar(caminho, bytes);
+        const { mudou } = this.arquivos.registrarNos(this.catalogo, caminho, bytes);
         if (mudou) {
           if (existiaAntes) mudados++;
           else novos++;
+          this.recarregarModelo(caminho);
         }
       } catch (erro) {
         ultimoErro = erro instanceof Error ? erro.message : String(erro);
       }
     }
     const removidos = this.catalogo.removerAusentes(vistos);
+    for (const caminho of removidos) {
+      this.arquivos.esquecer(caminho);
+      this.recarregarModelo(caminho);
+    }
 
     const partes: string[] = [];
     if (novos > 0) partes.push(`${novos} novo${novos === 1 ? '' : 's'}`);
@@ -603,6 +742,15 @@ export class Editor {
     if (!node) return;
     this.history.record('renomear', `nome:${node.id}`);
     this.document.rename(node.id, name);
+  }
+
+  /** Troca (ou tira) o arquivo que a peça Modelo selecionada desenha. */
+  setModelo(caminho: string | null): void {
+    const node = this.selectedNode;
+    if (!node) return;
+    this.history.record('trocar o modelo', `modelo:${node.id}`);
+    this.document.setModelo(node.id, caminho);
+    this.notify();
   }
 
   setColor(color: number | null): void {
@@ -1161,6 +1309,53 @@ function lerPerfilSalvo(): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Percorre as entradas de um arrasto e devolve os arquivos com o caminho de
+ * projeto de cada um, pasta e subpasta incluídas.
+ *
+ * A API de entradas é de callback e de uma página por vez (`readEntries`
+ * devolve um punhado, e só devolve lista vazia quando acabou) — daí as duas
+ * promessas embrulhadas aqui.
+ */
+async function itensDeEntradas(
+  raizes: FileSystemEntry[],
+): Promise<{ caminho: string; arquivo: File }[]> {
+  const saida: { caminho: string; arquivo: File }[] = [];
+  const fila = raizes.map((entrada) => ({ entrada, base: 'assets/' }));
+
+  while (fila.length > 0) {
+    const { entrada, base } = fila.pop()!;
+    if (entrada.isFile) {
+      const arquivo = await new Promise<File | null>((resolve) =>
+        (entrada as FileSystemFileEntry).file(resolve, () => resolve(null)),
+      );
+      if (arquivo) saida.push({ caminho: base + entrada.name, arquivo });
+    } else if (entrada.isDirectory) {
+      const leitor = (entrada as FileSystemDirectoryEntry).createReader();
+      for (;;) {
+        const lote = await new Promise<FileSystemEntry[]>((resolve) =>
+          leitor.readEntries(resolve, () => resolve([])),
+        );
+        if (lote.length === 0) break;
+        for (const filho of lote) fila.push({ entrada: filho, base: `${base}${entrada.name}/` });
+      }
+    }
+  }
+  return saida;
+}
+
+/** Só um `.glb`/`.gltf` é modelo — o resto do catálogo não interessa à cena 3D. */
+function ehModelo(caminho: string): boolean {
+  return /\.(glb|gltf)$/i.test(caminho);
+}
+
+/** "assets/modelos/tails/scene.gltf" vira "scene" — o nome que vai para a árvore. */
+function nomeDeArquivo(caminho: string): string {
+  const arquivo = caminho.split('/').pop() ?? caminho;
+  const ponto = arquivo.lastIndexOf('.');
+  return ponto > 0 ? arquivo.slice(0, ponto) : arquivo;
 }
 
 /**

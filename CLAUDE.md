@@ -9,6 +9,8 @@ tarefa, qual modelo e qual nível de raciocínio usar.
 
 - `packages/runtime` — laço do jogo, física, orçamento de performance.
 - `packages/blocos`, `autoria` — modelo de autoria (blocos, projeto).
+- `packages/assets` — importação (formato, hash, dependências de um glTF), `kit-inicial`.
+- `packages/interface` — telas 2D e menus (M9).
 - `packages/kit-brinquedos`, `kit-inimigos`, `kit-velocidade` — kits de conteúdo.
 - `apps/editor` (Vite+React), `apps/playground` (cena de referência), `apps/portal`.
 - `scripts/montar-site.mjs` → `site/`; `.github/workflows/ci.yml` roda tipos, testes e build.

@@ -15,8 +15,13 @@ const ICONE: Record<AssetKind, string> = {
  *
  * Arrastar de novo um arquivo com o mesmo nome não duplica — é reimportação,
  * e quem decide se mudou é o hash guardado em `editor.catalogo`, não este
- * componente. glTF, Aseprite, Tiled e Blender ainda não têm importador; o
- * aviso de erro do `@faisca/assets` explica isso na barra do editor.
+ * componente.
+ *
+ * Um `.glb`/`.gltf` ganha um botão "na cena": é o caminho mais curto entre
+ * arrastar o arquivo e vê-lo na fase. Arrastar a *pasta* de um modelo
+ * funciona e é o jeito certo para um `.gltf`, que aponta para o `.bin` e
+ * para `textures/` ao lado — um `.gltf` sem eles aparece na lista dizendo o
+ * que falta, em vez de virar uma peça vazia depois.
  */
 export function Assets({ editor }: { editor: Editor }) {
   const [sobre, setSobre] = useState(false);
@@ -39,10 +44,10 @@ export function Assets({ editor }: { editor: Editor }) {
         onDrop={(event) => {
           event.preventDefault();
           setSobre(false);
-          void editor.importarArquivos(event.dataTransfer.files);
+          void editor.importarArrasto(event.dataTransfer);
         }}
       >
-        Arraste arquivos aqui, ou clique para escolher
+        Arraste arquivos ou pastas aqui, ou clique para escolher
         <input
           type="file"
           multiple
@@ -73,17 +78,39 @@ export function Assets({ editor }: { editor: Editor }) {
         {itens.length === 0 ? (
           <p className="vazio">Nenhum asset ainda.</p>
         ) : (
-          itens.map((asset) => (
-            <div className="ramo" key={asset.caminho} title={asset.caminho}>
-              <span className="icone">{ICONE[asset.tipo]}</span>
-              <span className="nome">{asset.caminho}</span>
-              <span className="conta">{formatarTamanho(asset.tamanho)}</span>
-            </div>
-          ))
+          itens.map((asset) => {
+            const faltando = editor.catalogo.faltando(asset.caminho);
+            return (
+              <div className="ramo" key={asset.caminho} title={asset.caminho}>
+                <span className="icone">{ICONE[asset.tipo]}</span>
+                <span className="nome">
+                  {asset.caminho}
+                  {faltando.length > 0 ? (
+                    <small className="aviso"> falta {faltando.join(', ')}</small>
+                  ) : null}
+                </span>
+                {ehModelo(asset.caminho) ? (
+                  <button
+                    type="button"
+                    className="mini"
+                    title="Pôr este modelo na fase"
+                    onClick={() => editor.adicionarModelo(asset.caminho)}
+                  >
+                    na cena
+                  </button>
+                ) : null}
+                <span className="conta">{formatarTamanho(asset.tamanho)}</span>
+              </div>
+            );
+          })
         )}
       </div>
     </section>
   );
+}
+
+function ehModelo(caminho: string): boolean {
+  return /\.(glb|gltf)$/i.test(caminho);
 }
 
 function formatarTamanho(bytes: number): string {

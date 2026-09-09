@@ -352,6 +352,30 @@ M5 ✅ blocos ⇄ código · M6 ✅ gatilho-e-resposta e perfil Design · M7 ✅
 > sincronização de pasta, e o kit inicial gerado por código como
 > placeholder — a arte licenciada final da seção 11 continua pendente.
 
+> **A sexta fatia (fora da M8, em cima dela): o modelo importado vira peça.**
+> Até aqui os seis formatos tinham validação estrutural, mas nada desenhava um
+> `.glb` — a M8 disse isso na quarta fatia ("sem montar a cena, isso é trabalho
+> do motor 3D"). Agora o `@faisca/runtime` tem `CarregadorDeModelos`, e a
+> autoria tem a peça **Modelo**: um nó guarda o *caminho* do arquivo
+> (`node.modelo`) e o montador troca o marcador pelo modelo quando ele abre,
+> com o colisor saindo da malha que chegou — "o que se vê é o que se colide"
+> passa a valer também para modelo importado. Três decisões que valem registro:
+> um `.gltf` é **remontado como GLB único antes do parse**
+> (`empacotar-glb.ts`), porque o GLTFLoader resolveria as URIs externas indo à
+> rede, e a Faísca não tem rede, tem catálogo — de quebra, `.gltf` e `.glb`
+> viram o mesmo caminho de código, sem `fetch` e sem DOM, e por isso testável
+> no Vitest; todo modelo entra com **altura padrão e apoiado pela base**, senão
+> um modelo baixado da internet chega em centímetros ou em metros conforme quem
+> exportou; e arrastar a **pasta** de um modelo passa a preservar as subpastas
+> (`webkitGetAsEntry`), sem o que o `textures/` de um `.gltf` se perderia. O
+> `.bin` entrou na lista de formatos por consequência: sem ele no catálogo, um
+> `.gltf` ficava com uma dependência impossível de satisfazer.
+>
+> O que continua de fora: **animação** (o carregador já devolve os clipes de
+> `gltf.animations`, mas nada os toca ainda), KTX2/Draco na publicação, e
+> `.blend` de verdade — para esse, exportar em glTF pelo Blender continua sendo
+> o caminho.
+
 > **Sobre a M7.** A pista sai de uma curva Catmull-Rom desenhada clicando no
 > viewport (ferramenta **Pista**): cada ponto guarda posição, largura e
 > inclinação, e o montador gera a fita e o colisor de malha dela do mesmo

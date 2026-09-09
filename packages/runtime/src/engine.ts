@@ -53,6 +53,15 @@ export class Engine {
   /** O mundo de fisica, ou null se a engine foi criada sem ela. */
   readonly physics: PhysicsWorld | null;
   readonly bodies: BodyRegistry | null;
+  /**
+   * Quem abre um modelo 3D importado, por caminho do projeto.
+   *
+   * Fica vazio numa engine sem catalogo de assets, e por isso e um campo e
+   * nao uma opcao do construtor: quem monta o catalogo — o editor, o jogo
+   * publicado — costuma existir *depois* da engine. Ver
+   * `CarregadorDeModelos`, em `render/modelos.ts`.
+   */
+  carregarModelo?: (caminho: string) => Promise<THREE.Object3D | null>;
 
   private readonly batches: InstancedBatch[] = [];
   private logicMs = 0;

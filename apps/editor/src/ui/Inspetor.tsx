@@ -84,6 +84,8 @@ export function Inspetor({ editor }: { editor: Editor }) {
         </label>
       </div>
 
+      {node.piece === 'modelo' ? <EscolherModelo editor={editor} node={node} /> : null}
+
       {node.spline ? <PistaInfo editor={editor} node={node} /> : <Transformar editor={editor} node={node} />}
 
       {componentes.length === 0 ? null : (
@@ -123,6 +125,51 @@ export function Inspetor({ editor }: { editor: Editor }) {
         </button>
       </div>
     </section>
+  );
+}
+
+/**
+ * Qual arquivo esta peca desenha.
+ *
+ * A lista sai do catalogo de assets do projeto, e nao de um seletor de
+ * arquivos: o modelo tem que ter passado pela importacao antes (e por isso
+ * as dependencias dele — o `.bin`, as texturas — ja estarem no projeto).
+ * Um modelo com pedaco faltando aparece na lista, mas dizendo o que falta,
+ * em vez de sumir e deixar a pessoa procurando.
+ */
+function EscolherModelo({ editor, node }: { editor: Editor; node: SceneNode }) {
+  const modelos = editor.catalogo
+    .listar()
+    .filter((asset) => /\.(glb|gltf)$/i.test(asset.caminho));
+  const faltando = node.modelo ? editor.catalogo.faltando(node.modelo) : [];
+
+  return (
+    <div className="bloco">
+      <label className="campo">
+        <span className="rotulo">Modelo</span>
+        <select
+          value={node.modelo ?? ''}
+          onChange={(event) => editor.setModelo(event.target.value || null)}
+          {...pararTeclas}
+        >
+          <option value="">— escolha um modelo —</option>
+          {modelos.map((asset) => (
+            <option key={asset.caminho} value={asset.caminho}>
+              {asset.caminho}
+            </option>
+          ))}
+        </select>
+      </label>
+      {modelos.length === 0 ? (
+        <p className="vazio">
+          Nenhum modelo importado ainda. Arraste um <code>.glb</code> — ou a pasta inteira de um{' '}
+          <code>.gltf</code> — no painel de Assets.
+        </p>
+      ) : null}
+      {faltando.length > 0 ? (
+        <p className="aviso">Faltam arquivos deste modelo: {faltando.join(', ')}.</p>
+      ) : null}
+    </div>
   );
 }
 

@@ -358,6 +358,37 @@ label.botao:hover {
   cursor: default;
 }
 
+/* Botao pequeno de dentro de uma linha de lista ("na cena", no painel de
+   Assets): so aparece de verdade quando o ponteiro esta na linha, para a
+   lista continuar sendo uma lista e nao uma parede de botoes. */
+.ramo .mini {
+  padding: 2px 6px;
+  font-size: 10px;
+  border-radius: 4px;
+  background: var(--painel-alto);
+  color: var(--apagado);
+  opacity: 0;
+}
+
+.ramo:hover .mini,
+.ramo .mini:focus-visible {
+  opacity: 1;
+  color: inherit;
+}
+
+/* O que falta para um asset abrir (o `.bin` de um `.gltf`, uma textura). */
+.aviso,
+.ramo .nome .aviso {
+  color: #f0b45c;
+  font-size: 10px;
+}
+
+.painel .aviso {
+  margin: 6px 0 0;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
 /* --- Arvore --------------------------------------------------------------- */
 
 .arvore .lista {

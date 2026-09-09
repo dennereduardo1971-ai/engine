@@ -1,6 +1,7 @@
 export { validarAse } from './ase.ts';
 export { validarBlend } from './blend.ts';
 export { CatalogoDeAssets, type ResultadoRegistro } from './catalogo.ts';
+export { DepositoDeArquivos } from './deposito.ts';
 export {
   dependenciasDeModelo,
   pastaDe,

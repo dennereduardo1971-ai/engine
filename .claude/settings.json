@@ -1,4 +1,4 @@
 {
   "autoCompactEnabled": true,
-  "autoCompactWindow": 150000
+  "autoCompactWindow": 1000000
 }

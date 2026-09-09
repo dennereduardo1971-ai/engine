@@ -57,5 +57,5 @@ diagnóstico não fechou). "Parece complexo" não é sintoma.
    do zero e repaga todo o contexto deste arquivo.
 6. Não repetir o diff na resposta; dizer o que mudou e onde (`arquivo:linha`).
 7. Uma verificação validada antes do push vale mais que três pushes especulativos.
-8. Auto-compact fecha a janela em 150k tokens (`.claude/settings.json`,
+8. Auto-compact fecha a janela em 1M tokens (`.claude/settings.json`,
    chave `autoCompactWindow`). Sessão longa resume sozinha antes de encher.
